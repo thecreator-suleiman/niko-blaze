@@ -71,6 +71,9 @@ def plan(extra: dict | None = None):
     if db.is_paused():
         db.log("info", "plan", "automation paused — nothing planned")
         return
+    if cfg("generation.provider") == "none":
+        db.log("info", "plan", "setup not finished (generation.provider: none) — nothing planned")
+        return
     rng = random.Random(f"{today()}-{datetime.now(timezone.utc).timestamp()}")
     sch = cfg("schedule")
     weekday = datetime.now(TZ).strftime("%a")

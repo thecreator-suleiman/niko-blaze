@@ -3,7 +3,7 @@ artist: Niko Blaze
 timezone: Africa/Kigali
 
 generation:
-  provider: kaggle            # kaggle | local_acestep | none
+  provider: none              # set to kaggle after setup Step 2 (kaggle | local_acestep | none)
   model_id: ACE-Step/acestep-v15-xl-turbo-diffusers   # MIT licence
   fallback_model_id: ACE-Step/acestep-v15-sft          # MIT licence, used if the primary returns NaN/silence
   inference_steps: 8          # turbo = 8; raise to 30-50 for sft/base
