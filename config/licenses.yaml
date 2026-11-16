@@ -55,8 +55,8 @@ components:
     what: Artist portrait at assets/artist/portrait.jpg
     licence: Owner must hold rights (own photo or written permission from photographer)
     commercial_use: owner_must_confirm
-    notes: If no portrait file exists, an original generated silhouette is used instead (covered by visual:procedural).
-    status: pending_owner_review
+    notes: Official Niko Blaze photo supplied and confirmed by the owner (Kwizera Suleiman) on 2026-11-16.
+    status: verified
   font:system:
     what: DejaVu / system fonts (or files in assets/fonts)
     licence: DejaVu licence (free, permissive) / OFL for Google Fonts
