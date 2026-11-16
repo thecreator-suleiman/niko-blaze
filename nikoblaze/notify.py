@@ -22,14 +22,17 @@ def _call(method, data=None, files=None):
     return r.json()
 
 
-def text(msg: str):
+def text(msg: str) -> bool:
     if not enabled():
-        return
+        return False
+    ok = True
     for i in range(0, len(msg), 4000):
         try:
             _call("sendMessage", {"text": msg[i:i + 4000], "disable_web_page_preview": "true"})
         except Exception as e:
+            ok = False
             print(f"[WARN] telegram: {e}")
+    return ok
 
 
 def _preview(video: Path) -> Path | None:

@@ -80,8 +80,10 @@ def main(argv=None):
         if not notify.enabled():
             print("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID secrets missing")
             return 1
-        notify.text("✅ Niko Blaze bot connected. You will get a green tick, the video, its description and "
-                    "hashtags every time something is posted to YouTube.")
+        if not notify.text("✅ Niko Blaze bot connected. You will get a green tick, the video, its description "
+                           "and hashtags every time something is posted to YouTube."):
+            print("Telegram refused the message: press Start in your bot and check TELEGRAM_CHAT_ID")
+            return 1
         print("telegram message sent")
     elif cmd == "maintenance":
         pipeline.prune_originals()
