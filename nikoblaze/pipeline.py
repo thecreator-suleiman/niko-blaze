@@ -334,8 +334,8 @@ def publish_pending():
     if db.is_paused() or not cfg("youtube.enabled", False):
         return
     rows = db.get().execute("SELECT * FROM uploads WHERE status IN ('pending','failed') AND attempts < 5 "
-                            "ORDER BY created_at").fetchall()
-    for u in rows:
+                            "ORDER BY CASE kind WHEN 'mix' THEN 0 WHEN 'single' THEN 1 ELSE 2 END, created_at").fetchall()
+    for u in rows:  # mixes & singles first so the free monthly upload budget goes to the main videos
         cap = int(cfg(f"publishing.max_per_week.{u['kind']}", 1))
         done = db.get().execute("SELECT COUNT(*) n FROM uploads WHERE kind=? AND status='uploaded' AND updated_at>=?",
                                 (u["kind"], _week_start())).fetchone()["n"]
