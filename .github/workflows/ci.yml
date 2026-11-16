@@ -1,0 +1,16 @@
+name: Tests
+on:
+  push:
+    paths-ignore: ["state/**", "dashboard/**", "docs/**", "*.md"]
+  pull_request:
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with: {pull-state: "false"}
+      - run: pip install -q pytest && python -m pytest -q tests

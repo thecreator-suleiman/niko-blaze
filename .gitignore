@@ -1,0 +1,9 @@
+work/
+storage_local/
+state/*.db
+dashboard/data/status.json
+__pycache__/
+*.pyc
+.env
+client_secret*.json
+.pytest_cache/

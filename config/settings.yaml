@@ -1,0 +1,67 @@
+# NIKO BLAZE — main configuration. Every value can be changed without touching code.
+artist: Niko Blaze
+timezone: Africa/Kigali
+
+generation:
+  provider: kaggle            # kaggle | local_acestep | none
+  model_id: ACE-Step/acestep-v15-xl-turbo-diffusers   # MIT licence
+  fallback_model_id: ACE-Step/acestep-v15-sft          # MIT licence, used if the primary returns NaN/silence
+  inference_steps: 8          # turbo = 8; raise to 30-50 for sft/base
+  candidates_per_song: 2      # generate N takes, keep the best that passes QC
+  max_attempts_per_song: 3    # after this, the brief is abandoned (never published)
+  kaggle_kernel_slug: niko-blaze-gen
+  kaggle_weekly_gpu_hours: 30 # Kaggle free quota (check your account page; Kaggle may change it)
+  kaggle_safety_margin_hours: 4
+  est_gpu_seconds_per_take: 90  # conservative T4 estimate incl. transcription; refined from real runs
+  batch_overhead_seconds: 900   # install + model download per Kaggle run
+  batch_timeout_hours: 11
+
+daily:
+  singles: {department: afrobeats, count: 2}      # published as individual videos
+  library_additions: {reggae: 3, relaxation: 3, afrobeats: 1}  # tracks that feed the hour mixes
+  mixes: [reggae, afrobeats, relaxation]
+  mix_target_minutes: 60
+  mix_min_minutes: 50         # below this the mix is skipped, never padded with repeats in one video
+  track_reuse_cooldown_days: 10
+
+durations:                    # seconds
+  afrobeats: {min: 140, max: 235}
+  reggae: {min: 150, max: 235}
+  relaxation: {min: 200, max: 360}
+  single_hard_max: 240        # individual songs never exceed 4:00
+
+quality:
+  min_score: 70
+  vocal_min_lyric_match: 0.35   # share of lyric words recognised in the sung audio
+  vocal_good_lyric_match: 0.55
+  instrumental_max_words: 12    # relaxation tracks must not contain sung words
+
+mastering:
+  sample_rate: 48000
+  default: {lufs: -14.0, true_peak: -1.0, lra: 11}
+  relaxation: {lufs: -16.0, true_peak: -1.5, lra: 15}
+  compressor: {threshold_db: -20, ratio: 1.8, attack_ms: 25, release_ms: 300}
+  aac_bitrate: 384k
+
+lyrics:
+  providers: [github_models, gemini]   # both free tiers; if none works vocal songs are skipped (no filler lyrics)
+  github_model: openai/gpt-4.1-mini
+  gemini_model: gemini-2.5-flash
+  max_rewrites: 3
+  history_similarity_max: 0.18
+
+youtube:
+  enabled: false            # turn on after setup (docs/SETUP.md)
+  privacy: private          # private | unlisted | public | scheduled  (unverified API projects: private only)
+  schedule_local_times: {single: ["12:00", "18:00"], mix: "20:00"}
+  max_uploads_per_day: 6
+  category_id: "10"         # Music
+  contains_synthetic_media: true   # YouTube altered/synthetic content disclosure — never set false
+  set_thumbnails: true      # needs a phone-verified channel
+
+livestream:
+  enabled: false            # needs a persistent machine; never run on GitHub Actions (see docs)
+
+storage:
+  release_prefix: media
+  keep_originals_days: 60   # originals are pruned after this; masters are kept

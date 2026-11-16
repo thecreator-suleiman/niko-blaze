@@ -1,0 +1,137 @@
+"""Vinyl music visualizer (songs) and seamless-loop visual (hour mixes). FFmpeg + Pillow only."""
+import textwrap
+from pathlib import Path
+
+from PIL import Image, ImageDraw
+
+from ..audio.analysis import ffmpeg
+from . import assets
+from .style import PALETTES, ass_font_name, font
+
+W, H, FPS = 1920, 1080, 30
+RPM = 100 / 3  # 33 1/3
+DECK_POS = (900, 150)
+VINYL = 640
+
+
+def _ass_time(t: float) -> str:
+    t = max(0.0, t)
+    return f"{int(t // 3600)}:{int(t % 3600 // 60):02d}:{t % 60:05.2f}"
+
+
+def _ass_color(rgb, alpha=0):
+    r, g, b = rgb
+    return f"&H{alpha:02X}{b:02X}{g:02X}{r:02X}"
+
+
+def lyrics_ass(lines: list[dict], dept: str, path: Path, duration: float):
+    p = PALETTES[dept]
+    fn = ass_font_name()
+    head = f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {W}
+PlayResY: {H}
+WrapStyle: 0
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Cur,{fn},56,{_ass_color(p['accent'])},{_ass_color((255, 255, 255))},&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,3,2,2,80,80,118,1
+Style: Nxt,{fn},36,&H50FFFFFF,&H50FFFFFF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,1,2,80,80,34,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    esc = lambda s: s.replace("{", "(").replace("}", ")").replace("\\", "/")
+    ev = []
+    for i, ln in enumerate(lines):
+        start = ln["start"] - 0.2
+        nxt = lines[i + 1]["start"] if i + 1 < len(lines) else duration
+        end = min(max(ln["end"] + 1.2, start + 1.5), nxt - 0.05) if i + 1 < len(lines) else min(ln["end"] + 3, duration)
+        if end <= start:
+            end = start + 0.8
+        k, cursor = [], start
+        for w, s, e in ln["words"]:
+            if s > cursor:
+                k.append(f"{{\\k{int((s - cursor) * 100)}}}")
+            k.append(f"{{\\kf{max(1, int((e - max(s, cursor)) * 100))}}}{esc(w)} ")
+            cursor = max(cursor, e)
+        ev.append(f"Dialogue: 1,{_ass_time(start)},{_ass_time(end)},Cur,,0,0,0,,{{\\fad(150,150)}}{''.join(k).strip()}")
+        if i + 1 < len(lines):
+            ev.append(f"Dialogue: 0,{_ass_time(start)},{_ass_time(end)},Nxt,,0,0,0,,{{\\fad(150,150)}}{esc(lines[i + 1]['text'])}")
+    path.write_text(head + "\n".join(ev) + "\n", encoding="utf-8")
+
+
+def _compose(dept: str, title: str, subtitle: str, out_dir: Path, badge: str | None = None):
+    """Writes base.png (static), vinyl.png (rotating), top.png (sheen+tonearm). Returns vinyl position."""
+    p = PALETTES[dept]
+    portrait, _ = assets.load_portrait()
+    bg = assets.background(dept, portrait=portrait)
+    card = assets.portrait_card(portrait, 520, p["accent"])
+    bg.alpha_composite(card, (110, 150))
+    base_deck, top_deck, (pcx, pcy) = assets.deck(dept, vinyl_size=VINYL)
+    bg.alpha_composite(base_deck, DECK_POS)
+    d = ImageDraw.Draw(bg)
+    d.text((150, 62), "NIKO BLAZE", font=font(54), fill=(255, 255, 255), spacing=8)
+    d.rectangle((152, 128, 330, 134), fill=p["accent"])
+    chip = p["chip"] if not badge else badge
+    cf = font(26)
+    tw = d.textlength(chip, font=cf)
+    d.rounded_rectangle((W - 150 - tw - 40, 66, W - 150, 116), radius=25, outline=p["accent"], width=3)
+    d.text((W - 150 - tw - 20, 76), chip, font=cf, fill=p["accent"])
+    tf = font(50)
+    y = 760
+    for line in textwrap.wrap(title, 22)[:2]:
+        d.text((150, y), line, font=tf, fill=(255, 255, 255), stroke_width=2, stroke_fill=(0, 0, 0))
+        y += 62
+    d.text((152, y + 6), subtitle, font=font(30, bold=False), fill=(*p["accent2"],))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    bg.convert("RGB").save(out_dir / "base.png")
+    vx, vy = DECK_POS[0] + pcx - VINYL // 2, DECK_POS[1] + pcy - VINYL // 2
+    assets.vinyl(dept, VINYL).save(out_dir / "vinyl.png")
+    top = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    top.alpha_composite(assets.sheen(VINYL), (vx, vy))
+    top.alpha_composite(top_deck, DECK_POS)
+    top.save(out_dir / "top.png")
+    return vx, vy
+
+
+def _rotate_graph(vx, vy):
+    return (f"[1:v]format=rgba,rotate=a='t*2*PI*{RPM / 60:.6f}':c=none:ow=iw:oh=ih[vin];"
+            f"[0:v][vin]overlay=x={vx}:y={vy}[b1];[b1][2:v]overlay=0:0[b2]")
+
+
+def render_song(dept: str, title: str, audio: Path, lines: list[dict], duration: float, out: Path,
+                preset="medium", crf=20) -> Path:
+    tmp = out.parent / (out.stem + "_layers")
+    vx, vy = _compose(dept, title, "Niko Blaze · Original Song", tmp)
+    ass = tmp / "lyrics.ass"
+    lyrics_ass(lines, dept, ass, duration)
+    acc = "0x%02X%02X%02X" % PALETTES[dept]["accent"]
+    graph = (_rotate_graph(vx, vy) +
+             f";[3:a]showwaves=s=960x44:mode=cline:draw=full:rate={FPS}:colors={acc}@0.85,format=rgba[wav];"
+             f"[b2][wav]overlay=x=480:y=1028:format=rgb[b3];[b3]ass='{ass.as_posix()}'[v]")
+    ffmpeg("-loop", "1", "-framerate", str(FPS), "-i", str(tmp / "base.png"),
+           "-loop", "1", "-framerate", str(FPS), "-i", str(tmp / "vinyl.png"),
+           "-loop", "1", "-framerate", str(FPS), "-i", str(tmp / "top.png"),
+           "-i", str(audio), "-filter_complex", graph, "-map", "[v]", "-map", "3:a",
+           "-t", f"{duration:.3f}", "-r", str(FPS), "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
+           "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "384k", "-ar", "48000", "-movflags", "+faststart",
+           str(out))
+    return out
+
+
+def render_mix(dept: str, title: str, audio_m4a: Path, duration: float, out: Path, badge: str) -> Path:
+    """Render one seamless 18 s loop (10 record rotations), then stream-copy it for the whole hour."""
+    tmp = out.parent / (out.stem + "_layers")
+    vx, vy = _compose(dept, title, "Pre-recorded 1-hour mix · Niko Blaze", tmp, badge=badge)
+    loop = tmp / "loop.mp4"
+    loop_len = 10 * 60 / RPM  # exactly 10 rotations = 18 s
+    ffmpeg("-loop", "1", "-framerate", str(FPS), "-i", str(tmp / "base.png"),
+           "-loop", "1", "-framerate", str(FPS), "-i", str(tmp / "vinyl.png"),
+           "-loop", "1", "-framerate", str(FPS), "-i", str(tmp / "top.png"),
+           "-filter_complex", _rotate_graph(vx, vy), "-map", "[b2]", "-t", f"{loop_len:.3f}", "-r", str(FPS),
+           "-c:v", "libx264", "-preset", "slow", "-crf", "23", "-g", str(int(loop_len * FPS)),
+           "-pix_fmt", "yuv420p", str(loop))
+    ffmpeg("-stream_loop", "-1", "-i", str(loop), "-i", str(audio_m4a), "-map", "0:v", "-map", "1:a",
+           "-c", "copy", "-t", f"{duration:.3f}", "-movflags", "+faststart", str(out))
+    return out

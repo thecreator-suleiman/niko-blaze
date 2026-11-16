@@ -1,0 +1,6 @@
+# Only for running generation on your own CUDA machine (provider: local_acestep). Kaggle installs these itself.
+torch
+diffusers>=0.39.0
+transformers
+accelerate
+faster-whisper

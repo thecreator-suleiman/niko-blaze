@@ -1,0 +1,25 @@
+name: Dashboard (GitHub Pages)
+on:
+  workflow_run:
+    workflows: ["Produce (plan + GPU batch)", "Collect (QC, master, render, publish)", "Hour mixes", "Control (manual)", "Maintenance (weekly)"]
+    types: [completed]
+  push:
+    branches: [main]
+    paths: ["dashboard/**"]
+  workflow_dispatch:
+permissions: {contents: read, pages: write, id-token: write}
+concurrency: {group: pages, cancel-in-progress: true}
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: {name: github-pages, url: "${{ steps.d.outputs.page_url }}"}
+    env: {GH_TOKEN: "${{ github.token }}"}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: python -m nikoblaze export-dashboard
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: {path: dashboard}
+      - id: d
+        uses: actions/deploy-pages@v4

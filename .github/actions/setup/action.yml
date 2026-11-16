@@ -1,0 +1,17 @@
+name: Niko Blaze setup
+description: Python, FFmpeg, fonts, dependencies and the state database
+inputs:
+  pull-state: {default: "true", description: Download state DB from the 'state' release}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with: {python-version: "3.12", cache: pip}
+    - shell: bash
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq ffmpeg fonts-dejavu-core fontconfig > /dev/null
+        pip install -q -r requirements.txt
+    - if: inputs.pull-state == 'true'
+      shell: bash
+      run: python -m nikoblaze state-pull

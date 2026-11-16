@@ -1,0 +1,51 @@
+# Licensing registry. Publishing is BLOCKED unless every component used by a release is `verified`.
+# Only the owner may change `pending_owner_review` to `verified`, after reading the linked terms.
+components:
+  model:ace-step-1.5:
+    what: Music generation model (ACE-Step 1.5, weights + code)
+    licence: MIT
+    commercial_use: true
+    source: https://huggingface.co/ACE-Step/acestep-v15-base
+    notes: MIT licence on code and weights. Developers state training data is licensed, royalty-free or synthetic. AI output may have limited copyright protection in some countries.
+    status: verified
+  lyrics:github_models:
+    what: Lyric drafting via GitHub Models free tier
+    licence: GitHub Terms + model provider terms
+    commercial_use: owner_must_confirm
+    source: https://docs.github.com/en/github-models
+    notes: Read GitHub Models / provider terms; outputs are generally assigned to the user. Confirm, then set verified.
+    status: pending_owner_review
+  lyrics:gemini:
+    what: Lyric drafting via Google Gemini API free tier
+    licence: Gemini API Additional Terms
+    commercial_use: owner_must_confirm
+    source: https://ai.google.dev/gemini-api/terms
+    notes: Free-tier prompts may be used by Google to improve products. Confirm terms, then set verified.
+    status: pending_owner_review
+  transcription:faster-whisper:
+    what: Lyric timing/intelligibility check (not published content)
+    licence: MIT (faster-whisper), MIT (Whisper weights)
+    commercial_use: true
+    source: https://github.com/SYSTRAN/faster-whisper
+    status: verified
+  visual:procedural:
+    what: Vinyl, turntable, backgrounds, thumbnails drawn by this code (Pillow/FFmpeg)
+    licence: Owned by Niko Blaze project
+    commercial_use: true
+    status: verified
+  visual:portrait:
+    what: Artist portrait at assets/artist/portrait.jpg
+    licence: Owner must hold rights (own photo or written permission from photographer)
+    commercial_use: owner_must_confirm
+    notes: If no portrait file exists, an original generated silhouette is used instead (covered by visual:procedural).
+    status: pending_owner_review
+  font:system:
+    what: DejaVu / system fonts (or files in assets/fonts)
+    licence: DejaVu licence (free, permissive) / OFL for Google Fonts
+    commercial_use: true
+    status: verified
+  samples:none:
+    what: No third-party samples are used by the pipeline
+    licence: n/a
+    commercial_use: true
+    status: verified

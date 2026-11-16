@@ -1,0 +1,35 @@
+name: Maintenance (weekly)
+on:
+  schedule: [{cron: "0 2 * * 0"}]
+  workflow_dispatch:
+permissions:
+  contents: write
+  models: read
+concurrency: {group: nikoblaze-state, cancel-in-progress: false}
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+      KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+      YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+      YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+      YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: python -m nikoblaze maintenance
+      - if: always()
+        run: python -m nikoblaze state-push
+      - name: Heartbeat commit (keeps scheduled workflows enabled; GitHub disables them after 60 idle days)
+        run: |
+          date -u +%FT%TZ > state/heartbeat.txt
+          git config user.name "niko-blaze-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/heartbeat.txt
+          git commit -m "heartbeat [skip ci]" || true
+          git push

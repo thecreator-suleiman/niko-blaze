@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NIKO BLAZE — Control Room</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand"><span class="logo">NIKO BLAZE</span><span class="sub">Autonomous Music Control Room</span></div>
+  <div id="state" class="pill">loading…</div>
+</header>
+<main>
+  <section class="grid" id="kpis"></section>
+
+  <section class="card">
+    <h2>Manual controls</h2>
+    <p class="muted">Buttons start the <b>Control</b> workflow. With a token saved on this device they run instantly;
+      otherwise they open GitHub where you press “Run workflow”. Everyday operation needs none of this.</p>
+    <div class="controls">
+      <select id="dept"><option>afrobeats</option><option>reggae</option><option>relaxation</option></select>
+      <button data-a="generate-song">Generate song</button>
+      <button data-a="generate-mix">Generate mix</button>
+      <button data-a="retry-production">Retry production</button>
+      <button data-a="retry-upload">Retry upload</button>
+      <button data-a="pause" class="warn">Pause automation</button>
+      <button data-a="resume" class="ok">Resume automation</button>
+    </div>
+    <details><summary>Device token (optional)</summary>
+      <p class="muted">Fine-grained GitHub token with <i>Actions: Read and write</i> on this repo only. Stored only in this browser.</p>
+      <input id="tok" type="password" placeholder="github_pat_…"><button id="savetok">Save</button><button id="cleartok">Clear</button>
+    </details>
+    <div id="ctlmsg" class="muted"></div>
+  </section>
+
+  <section class="grid3" id="depts"></section>
+
+  <section class="card"><h2>Credits &amp; quotas</h2><div id="credits" class="kv"></div></section>
+  <section class="card"><h2>Thumbnail library</h2><div id="thumbs" class="thumbs"></div></section>
+  <section class="card"><h2>YouTube publishing history</h2><div class="scroll"><table id="uploads"></table></div></section>
+  <section class="card"><h2>Song generation history</h2><div class="scroll"><table id="songs"></table></div></section>
+  <section class="card"><h2>Licensing status</h2><div class="scroll"><table id="lic"></table></div></section>
+  <section class="card"><h2>Errors &amp; logs</h2>
+    <label><input type="checkbox" id="onlyerr"> errors &amp; warnings only</label>
+    <div id="events" class="log"></div></section>
+</main>
+<footer class="muted" id="foot"></footer>
+<script src="app.js"></script>
+</body>
+</html>
