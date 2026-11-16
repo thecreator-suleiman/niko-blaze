@@ -12,6 +12,7 @@
   export-dashboard      write dashboard/data/status.json
   state-pull | state-push   sync the SQLite state with the 'state' GitHub release
   providers             print the music-provider capability matrix
+  telegram-test         send a test message to the Telegram bot
   maintenance           prune old originals, weekly DB backup
 """
 import json
@@ -74,6 +75,14 @@ def main(argv=None):
     elif cmd == "providers":
         from .music.providers import CAPABILITY_MATRIX
         print(json.dumps([asdict(c) for c in CAPABILITY_MATRIX], indent=1, ensure_ascii=False))
+    elif cmd == "telegram-test":
+        from . import notify
+        if not notify.enabled():
+            print("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID secrets missing")
+            return 1
+        notify.text("✅ Niko Blaze bot connected. You will get a green tick, the video, its description and "
+                    "hashtags every time something is posted to YouTube.")
+        print("telegram message sent")
     elif cmd == "maintenance":
         pipeline.prune_originals()
         db.log("info", "maintenance", "weekly maintenance done")

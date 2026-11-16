@@ -4,7 +4,7 @@ on:
     inputs:
       action:
         type: choice
-        options: [generate-song, generate-mix, retry-production, retry-upload, pause, resume, publish, status]
+        options: [generate-song, generate-mix, retry-production, retry-upload, pause, resume, publish, status, telegram-test]
       department:
         type: choice
         default: afrobeats
