@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import db, mixes, rights, storage
+from . import db, mixes, notify, rights, storage
 from .audio import align, analysis, mastering, quality
 from .config import DEPARTMENTS, cfg, mastering_target, work_dir
 from .lyrics import briefs, engine, llm
@@ -196,6 +196,7 @@ def process_song(sid: str, takes: list, src_dir: Path):
     if not passing:
         reasons = "; ".join(sorted({h for r in results for h in r[0]["hard"] + r[0]["warnings"]})) or "no takes produced"
         _requeue([sid], f"all takes rejected: {reasons}")
+        notify.problem(f"song '{song['title']}' rejected by quality control — regenerating")
         return
     qc, m, al, path = passing[0]
     day = datetime.now(TZ).strftime("%Y%m%d")
@@ -376,6 +377,7 @@ def publish_pending():
         except Exception as e:
             db.update("uploads", "id", u["id"], status="failed", attempts=u["attempts"] + 1, error=str(e)[:500])
             db.log("error", "publish", f"{u['ref_id']} upload failed: {e}")
+            notify.problem(f"upload failed for {u['ref_id']}: {str(e)[:300]}")
             continue
         db.update("uploads", "id", u["id"], status="uploaded", youtube_id=vid, title=meta["title"], privacy=privacy,
                   publish_at=when, attempts=u["attempts"] + 1, error=None)
@@ -387,6 +389,7 @@ def publish_pending():
         elif u["kind"] == "mix":
             db.update("mixes", "id", u["ref_id"], status="published")
         db.log("info", "publish", f"{u['ref_id']} -> {vid} ({privacy}, goes live {when})")
+        notify.posted(u["kind"], vid, meta, video, thumb, privacy, when)
         shutil.rmtree(wd, ignore_errors=True)
 
 

@@ -39,3 +39,6 @@ Dashboard buttons, or *Actions → Control (manual) → Run workflow* with an ac
 ## Getting help from Claude later
 Start a new Claude session, send the code **12003800**, then describe what to fix and share the
 repository link or the error text from the dashboard log.
+
+## Telegram reports
+Secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` make the bot send a ✅ message with the posted video (Shorts/singles; thumbnail for hour mixes), the description and hashtags, plus ⚠️ alerts for failures.
