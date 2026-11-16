@@ -21,7 +21,19 @@ Nothing here needs a credit card. Allow about one hour.
 - Read the terms linked in `config/licenses.yaml`, then change `lyrics:github_models` (and `lyrics:gemini`
   if used) from `pending_owner_review` to `verified`. Until then nothing is published.
 
-## 4. YouTube API (free)
+## 4a. Upload-Post (public uploads from day one — free, 10/month)
+1. Sign up at upload-post.com (free plan).
+2. *Manage Users* → create a profile (e.g. `nikoblaze`) → connect your YouTube channel with Google.
+3. *API Keys* → create a key.
+4. GitHub secrets: `UPLOADPOST_API_KEY` (the key) and `UPLOADPOST_USER` (the profile name).
+
+## 4b. Backup lyric AIs (free, optional — add any you can)
+- Groq: console.groq.com → API key → secret `GROQ_API_KEY`
+- OpenRouter: openrouter.ai → Keys → secret `OPENROUTER_API_KEY`
+- Cloudflare: dash.cloudflare.com → Workers AI → API token → secrets `CF_ACCOUNT_ID`, `CF_API_TOKEN`
+Then set their `lyrics:*` entries to `verified` in config/licenses.yaml after reading their terms.
+
+## 4c. Your own YouTube API (unlimited later)
 1. console.cloud.google.com → create project (no billing needed) → *APIs & Services → Library* →
    enable **YouTube Data API v3**.
 2. *OAuth consent screen*: External; app name "Niko Blaze Publisher"; add your Google account as a test
@@ -37,10 +49,8 @@ Nothing here needs a credit card. Allow about one hour.
    (On a computer you can instead run `python scripts/youtube_auth.py client_secret.json`.)
 5. Add secrets `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN`.
 6. Verify the channel by phone at youtube.com/verify (needed for custom thumbnails).
-7. **Important:** API projects that have not passed Google's free *YouTube API Services audit* can only
-   upload **private** videos. Keep `youtube.privacy: private` and make videos public yourself in the
-   YouTube Studio app, or apply for the audit (search "YouTube API Services Audit and Quota Extension
-   Form"). After approval set `privacy: scheduled`.
+7. Apply for Google's free audit using docs/YOUTUBE_AUDIT.md. Until approved, Upload-Post publishes
+   publicly; after approval set `youtube.audited: true`.
 
 ## 5. Artist photo (optional but recommended)
 Upload an authorised photo as `assets/artist/portrait.jpg` (GitHub web → *Add file → Upload files*), then

@@ -16,6 +16,8 @@ from .music.providers import get_provider
 from .visual import render, thumbnails
 from .youtube import client as yt
 from .youtube import metadata
+from .youtube import publish as publisher
+from .visual.style import set_variant
 
 TZ = ZoneInfo(cfg("timezone", "Africa/Kigali"))
 
@@ -59,19 +61,26 @@ def _new_song(dept: str, rng: random.Random, is_single: bool, subgenre=None) -> 
     return sid
 
 
+def week_mix_department(when=None) -> str:
+    rot = cfg("schedule.mix_rotation")
+    return rot[(when or datetime.now(TZ)).isocalendar().week % len(rot)]
+
+
 def plan(extra: dict | None = None):
     """Create today's briefs + lyrics, then submit one GPU batch."""
     if db.is_paused():
         db.log("info", "plan", "automation paused — nothing planned")
         return
     rng = random.Random(f"{today()}-{datetime.now(timezone.utc).timestamp()}")
+    sch = cfg("schedule")
+    weekday = datetime.now(TZ).strftime("%a")
     wanted = []
-    s = cfg("daily.singles")
-    wanted += [(s["department"], True)] * int(s["count"])
-    for dept, n in (cfg("daily.library_additions") or {}).items():
-        wanted += [(dept, False)] * int(n)
+    if weekday in sch["single_days"]:
+        wanted.append((sch["single_department"], True))
+    if weekday != "Sun":  # Mon-Sat build the library for this week's hour mix
+        wanted += [(week_mix_department(), False)] * int(sch["mix_tracks_per_day"])
     for dept, n in (extra or {}).items():
-        wanted += [(dept, dept == s["department"])] * n
+        wanted += [(dept, dept == sch["single_department"])] * n
     # capacity: songs waiting for a retry count first
     retry = db.get().execute("SELECT id FROM songs WHERE status='retry'").fetchall()
     per_take = cfg("generation.est_gpu_seconds_per_take")
@@ -218,10 +227,33 @@ def render_single(sid: str, master_wav: Path | None = None):
         master_wav = wd / f"{sid}_master.wav"
         analysis.ffmpeg("-i", str(flac), "-c:a", "pcm_s24le", str(master_wav))
     al = json.loads(song["align_json"]) if song["align_json"] else {"lines": []}
+    set_variant(int(hashlib.sha1(sid.encode()).hexdigest(), 16))
     out = wd / f"{sid}.mp4"
     render.render_song(song["department"], song["title"], Path(master_wav), al["lines"], song["master_duration"], out)
     thumb = thumbnails.make(song["department"], song["title"], wd / f"{sid}_thumb.jpg")
     _queue_upload("single", sid, out, thumb)
+    for k, st in enumerate(short_starts(song, al["lines"])):
+        short = wd / f"{sid}_short{k}.mp4"
+        render.render_short(song["department"], song["title"], Path(master_wav), al["lines"], st,
+                            min(45.0, song["master_duration"] - st), short)
+        _queue_upload("short", f"{sid}#s{k}", short, thumb)
+
+
+def short_starts(song: dict, lines: list) -> list[float]:
+    """Pick up to N distinct 45 s windows, preferring where the hook/chorus is sung."""
+    n = int(cfg("schedule.shorts_per_single", 3))
+    dur = song["master_duration"]
+    hook = (json.loads(song["brief_json"]).get("hook") or "").lower()[:25]
+    cands = [l["start"] - 1.0 for l in lines if hook and hook[:12] in l["text"].lower()]
+    cands += [dur * f for f in (0.3, 0.55, 0.75)]
+    out = []
+    for c in cands:
+        c = max(0.0, min(c, dur - 46))
+        if all(abs(c - o) > 30 for o in out):
+            out.append(round(c, 2))
+        if len(out) >= n:
+            break
+    return out
 
 
 def _sha(path: Path) -> str:
@@ -256,14 +288,46 @@ def _queue_upload(kind: str, ref_id: str, video: Path, thumb: Path, parts: dict 
 
 
 # ------------------------------------------------------------------ publish
-def _publish_time(kind: str, index: int) -> str | None:
-    times = cfg(f"youtube.schedule_local_times.{kind}")
-    hhmm = times[index % len(times)] if isinstance(times, list) else times
+DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
+def _week_start() -> str:
+    now = datetime.now(TZ)
+    start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    return start.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _publish_slot(kind: str, used: int) -> str:
+    """Next configured day/time for this kind (e.g. singles Friday 18:00 Kigali)."""
+    days = cfg(f"publishing.publish_days.{kind}")
+    days = days if isinstance(days, list) else [days]
+    hhmm = cfg(f"youtube.schedule_local_times.{kind}", "18:00")
+    hhmm = hhmm[0] if isinstance(hhmm, list) else hhmm
     h, m = map(int, hhmm.split(":"))
-    t = datetime.now(TZ).replace(hour=h, minute=m, second=0, microsecond=0)
-    if t < datetime.now(TZ) + timedelta(minutes=20):
-        t += timedelta(days=1)
+    now = datetime.now(TZ)
+    slots = []
+    for i in range(0, 15):
+        d = (now + timedelta(days=i)).replace(hour=h, minute=m, second=0, microsecond=0)
+        if d.strftime("%a") in days and d > now + timedelta(minutes=30):
+            slots.append(d)
+    t = slots[min(used, len(slots) - 1)]
     return t.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _meta_for(u) -> tuple[dict, list]:
+    if u["kind"] in ("single", "short"):
+        sid = u["ref_id"].split("#")[0]
+        song = dict(db.get().execute("SELECT * FROM songs WHERE id=?", (sid,)).fetchone())
+        song["concept"] = json.loads(song["brief_json"]).get("concept")
+        meta = metadata.single(song) if u["kind"] == "single" else metadata.short(song)
+        comps = [r["component"] for r in db.get().execute(
+            "SELECT component FROM rights WHERE ref_kind='song' AND ref_id=?", (sid,))]
+    else:
+        mx = db.get().execute("SELECT * FROM mixes WHERE id=?", (u["ref_id"],)).fetchone()
+        meta = metadata.mix(mx["department"], mx["volume"], json.loads(mx["chapters"]))
+        comps = sorted({r["component"] for tid in json.loads(mx["track_ids"]) for r in db.get().execute(
+            "SELECT component FROM rights WHERE ref_kind='song' AND ref_id=?", (tid,))})
+    return meta, comps
 
 
 def publish_pending():
@@ -271,18 +335,13 @@ def publish_pending():
         return
     rows = db.get().execute("SELECT * FROM uploads WHERE status IN ('pending','failed') AND attempts < 5 "
                             "ORDER BY created_at").fetchall()
-    for i, u in enumerate(rows):
-        if u["kind"] == "single":
-            song = dict(db.get().execute("SELECT * FROM songs WHERE id=?", (u["ref_id"],)).fetchone())
-            song["concept"] = json.loads(song["brief_json"]).get("concept")
-            meta = metadata.single(song)
-            comps = [r["component"] for r in db.get().execute(
-                "SELECT component FROM rights WHERE ref_kind='song' AND ref_id=?", (song["id"],))]
-        else:
-            mx = db.get().execute("SELECT * FROM mixes WHERE id=?", (u["ref_id"],)).fetchone()
-            meta = metadata.mix(mx["department"], mx["volume"], json.loads(mx["chapters"]))
-            comps = sorted({r["component"] for tid in json.loads(mx["track_ids"]) for r in db.get().execute(
-                "SELECT component FROM rights WHERE ref_kind='song' AND ref_id=?", (tid,))})
+    for u in rows:
+        cap = int(cfg(f"publishing.max_per_week.{u['kind']}", 1))
+        done = db.get().execute("SELECT COUNT(*) n FROM uploads WHERE kind=? AND status='uploaded' AND updated_at>=?",
+                                (u["kind"], _week_start())).fetchone()["n"]
+        if done >= cap:
+            continue  # channel-safety pacing: wait for next week
+        meta, comps = _meta_for(u)
         blocked = rights.blocked(comps)
         if blocked:
             db.update("uploads", "id", u["id"], status="blocked_rights", error="unverified: " + ", ".join(blocked))
@@ -293,9 +352,8 @@ def publish_pending():
         if dup:
             db.update("uploads", "id", u["id"], status="uploaded", youtube_id=dup["youtube_id"])
             continue
-        privacy = cfg("youtube.privacy", "private")
-        when = _publish_time("single" if u["kind"] == "single" else "mix", i) if privacy == "scheduled" else None
-        wd = work_dir("upload", u["ref_id"])
+        when = _publish_slot(u["kind"], done)
+        wd = work_dir("upload", u["ref_id"].replace("#", "_"))
         try:
             if u["video_asset"].startswith("{"):
                 p = json.loads(u["video_asset"])
@@ -307,14 +365,14 @@ def publish_pending():
                                     str(video))
             else:
                 video = storage.download(u["video_asset"], wd)
-            thumb = storage.download(u["thumb_asset"], wd)
-            vid = yt.upload(video, meta, privacy, when, thumb)
-        except yt.QuotaExhausted as e:
-            db.log("warn", "youtube", f"upload quota reached, will retry tomorrow: {e}")
+            thumb = storage.download(u["thumb_asset"], wd) if u["kind"] != "short" else None
+            vid, privacy = publisher.publish(video, meta, when, thumb)
+        except (yt.QuotaExhausted, publisher.NoPublisher) as e:
+            db.log("warn", "publish", f"{u['ref_id']} waiting: {e}")
             break
         except Exception as e:
             db.update("uploads", "id", u["id"], status="failed", attempts=u["attempts"] + 1, error=str(e)[:500])
-            db.log("error", "youtube", f"{u['ref_id']} upload failed: {e}")
+            db.log("error", "publish", f"{u['ref_id']} upload failed: {e}")
             continue
         db.update("uploads", "id", u["id"], status="uploaded", youtube_id=vid, title=meta["title"], privacy=privacy,
                   publish_at=when, attempts=u["attempts"] + 1, error=None)
@@ -323,9 +381,9 @@ def publish_pending():
                 storage.delete_asset(ref)  # video now lives on YouTube; free the space
         if u["kind"] == "single":
             db.update("songs", "id", u["ref_id"], status="published")
-        else:
+        elif u["kind"] == "mix":
             db.update("mixes", "id", u["ref_id"], status="published")
-        db.log("info", "youtube", f"{u['ref_id']} uploaded as {vid} ({privacy})")
+        db.log("info", "publish", f"{u['ref_id']} -> {vid} ({privacy}, goes live {when})")
         shutil.rmtree(wd, ignore_errors=True)
 
 
@@ -334,13 +392,14 @@ def daily_mixes(depts=None):
     if db.is_paused():
         db.log("info", "mix", "automation paused")
         return
-    for dept in depts or cfg("daily.mixes"):
+    for dept in depts or [week_mix_department()]:
         try:
             mx = mixes.build(dept)
             if not mx:
                 continue
             meta = metadata.mix(dept, mx["volume"], mx["chapters"])
             db.update("mixes", "id", mx["id"], title=meta["title"])
+            set_variant(int(hashlib.sha1(mx["id"].encode()).hexdigest(), 16))
             out = mx["dir"] / f"{mx['id']}.mp4"
             render.render_mix(dept, f"1 Hour {dept.title()} Mix · Vol. {mx['volume']}", mx["audio"], mx["duration"],
                               out, badge="1 HOUR · PRE-RECORDED")

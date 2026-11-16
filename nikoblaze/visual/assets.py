@@ -6,7 +6,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
 from ..config import ASSETS
-from .style import PALETTES, font
+from .style import pal, variant_seed, font
 
 W, H = 1920, 1080
 
@@ -20,10 +20,14 @@ def gradient(size, c1, c2, diagonal=True):
     return Image.composite(top, base, mask)
 
 
-def background(dept: str, size=(W, H), seed=7, portrait: Image.Image | None = None) -> Image.Image:
-    p = PALETTES[dept]
-    img = gradient(size, *p["bg"]).convert("RGBA")
+def background(dept: str, size=(W, H), seed=None, portrait: Image.Image | None = None) -> Image.Image:
+    p = pal(dept)
+    seed = seed if seed is not None else variant_seed() or 7
     rng = random.Random(seed)
+    c1, c2 = p["bg"] if rng.random() < 0.5 else p["bg"][::-1]
+    img = gradient(size, c1, c2).convert("RGBA")
+    if rng.random() < 0.5:
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)
     bokeh = Image.new("RGBA", size, (0, 0, 0, 0))
     d = ImageDraw.Draw(bokeh)
     for _ in range(26):
@@ -76,7 +80,7 @@ def portrait_card(portrait: Image.Image, size=560, accent=(255, 255, 255)) -> Im
 
 def vinyl(dept: str, size=640) -> Image.Image:
     """Rotating layer: disc, grooves and centre label (label text makes rotation visible)."""
-    p = PALETTES[dept]
+    p = pal(dept)
     ss = size * 2
     img = Image.new("RGBA", (ss, ss), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
@@ -122,7 +126,7 @@ def sheen(size=640) -> Image.Image:
 
 def deck(dept: str, w=940, h=720, vinyl_size=640) -> tuple[Image.Image, Image.Image, tuple]:
     """Returns (plinth layer, top layer with tonearm, platter centre within deck)."""
-    p = PALETTES[dept]
+    p = pal(dept)
     wood = [(74, 46, 28), (38, 23, 13)] if dept != "relaxation" else [(48, 52, 60), (20, 22, 28)]
     base = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     sh = Image.new("RGBA", (w, h), (0, 0, 0, 0))

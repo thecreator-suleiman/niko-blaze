@@ -42,9 +42,12 @@ def test_end_to_end(tmp, monkeypatch):
         "lyrics": "[Instrumental]" if b["instrumental"] else GOOD, "provider": "github_models"})
     monkeypatch.setattr(pipeline.render, "render_song",
                         lambda dept, title, audio, lines, dur, out, **k: (out.write_bytes(b"x"), out)[1])
-    monkeypatch.setenv("NB_DAILY__SINGLES", "{department: afrobeats, count: 1}")
-    monkeypatch.setenv("NB_DAILY__LIBRARY_ADDITIONS", "{relaxation: 1}")
-    pipeline.plan()
+    monkeypatch.setenv("NB_SCHEDULE__SINGLE_DAYS", "[Mon, Tue, Wed, Thu, Fri, Sat, Sun]")
+    monkeypatch.setenv("NB_SCHEDULE__MIX_TRACKS_PER_DAY", "0")
+    monkeypatch.setattr(pipeline, "week_mix_department", lambda when=None: "relaxation")
+    monkeypatch.setattr(pipeline, "render_single", lambda sid, w=None: pipeline._queue_upload(
+        "single", sid, _dummy(tmp, "v.mp4"), _dummy(tmp, "t.jpg")))
+    pipeline.plan(extra={"relaxation": 1})
     rows = db.get().execute("SELECT * FROM songs").fetchall()
     assert {r["status"] for r in rows} == {"submitted"}
     pipeline.collect()
@@ -61,8 +64,8 @@ def test_end_to_end(tmp, monkeypatch):
 
 def test_mix_builder(tmp, monkeypatch):
     from nikoblaze import mixes, storage
-    monkeypatch.setenv("NB_DAILY__MIX_TARGET_MINUTES", "1")
-    monkeypatch.setenv("NB_DAILY__MIX_MIN_MINUTES", "0.5")
+    monkeypatch.setenv("NB_SCHEDULE__MIX_TARGET_MINUTES", "1")
+    monkeypatch.setenv("NB_SCHEDULE__MIX_MIN_MINUTES", "0.5")
     for i in range(3):
         f = synth(tmp / f"r{i}.wav", 25, seed=i)
         ref = storage.upload("media-test", f)
@@ -72,3 +75,26 @@ def test_mix_builder(tmp, monkeypatch):
     mx = mixes.build("reggae")
     assert mx and len(mx["chapters"]) == 3
     assert abs(probe_duration(mx["audio"]) - (75 - 8)) < 1.0  # 3 x 25 s minus two 4 s crossfades
+
+
+def _dummy(tmp, name):
+    p = tmp / name
+    p.write_bytes(b"x")
+    return p
+
+
+def test_short_and_publish_chain(tmp, monkeypatch):
+    from nikoblaze.youtube import publish
+    lines = [{"text": "hook line here", "start": 60.0, "end": 62.0, "words": [("hook", 60, 60.5)]}]
+    song = {"master_duration": 200.0, "brief_json": '{"hook": "hook line here"}'}
+    st = pipeline.short_starts(song, lines)
+    assert st[0] == 59.0 and len(st) == 3 and all(s <= 154 for s in st)
+    monkeypatch.setenv("UPLOADPOST_API_KEY", "k")
+    monkeypatch.setenv("UPLOADPOST_USER", "u")
+    sent = {}
+    monkeypatch.setattr(publish, "upload_post", lambda v, m, w=None, t=None: sent.setdefault("ok", "uploadpost:1"))
+    assert publish.publish(tmp, {"title": "t"}, None) == ("uploadpost:1", "public")
+    monkeypatch.setenv("NB_PUBLISHING__UPLOAD_POST_MONTHLY_LIMIT", "0")
+    import pytest
+    with pytest.raises(publish.NoPublisher):
+        publish.publish(tmp, {"title": "t"}, None)

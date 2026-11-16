@@ -23,28 +23,20 @@ orchestrated by GitHub Actions at **zero cost**.
 | Dashboard | **GitHub Pages** (static; reads a JSON snapshot) | Cannot run anything itself. |
 | Publishing | **YouTube Data API** | ~100 uploads/day bucket; thumbnails cost 50 units. **Unverified API projects can only upload *private* videos** until Google's free compliance audit passes. |
 
-### What cannot be done for free (honest limits)
-
-1. **"Professionally produced, human-quality" vocals are not guaranteed.** ACE-Step 1.5 is the best
-   free option with singing (its own paper ranks it between Suno v4.5 and v5), but takes vary. The system
-   generates 2 takes per song and **rejects** takes that fail objective checks (clipping, noise, dropouts,
-   muffled audio, weak bass, phase problems, and *lyric intelligibility* measured by Whisper). It cannot judge
-   taste — listen to early results and tune `config/settings.yaml`.
-2. **Three brand-new hours of music every day** is beyond the free GPU quota. Each day adds new tracks
-   (default: 2 Afrobeats singles + 3 reggae + 3 relaxation + 1 extra afrobeats) and each hour mix is a
-   **new, never-repeated sequence** drawn from the growing library, favouring unused/newest tracks.
-   Mixes are skipped (not padded) until a department has ≥ 50 minutes of approved music (≈ 1–2 weeks).
-3. **24/7 livestreaming is not free.** GitHub's terms forbid using Actions as a streaming server.
-   Mixes are uploaded as normal videos titled **"(Pre-recorded)"**. `nikoblaze/youtube/live.py` can run a
-   scheduled broadcast from a machine you own (old PC/laptop) — disabled by default.
-4. **GitHub Actions terms risk.** GitHub says Actions should be used for work related to the repository's
-   software. Heavy daily media rendering for a YouTube channel is a grey area; GitHub could limit the
-   account. Mitigation: the whole pipeline also runs from the included `Dockerfile` on any machine.
-5. **Free tiers can change** within 2–3 years (Kaggle quota, GitHub Models limits). The system watches
-   usage, pauses gracefully, and logs the reason — it never reports fake success.
-6. **Monetization is not guaranteed.** YouTube's *inauthentic / mass-produced content* policy can
-   demonetize channels that upload many near-identical AI videos. Keep volume modest, keep stories varied,
-   and always keep the AI disclosure (`containsSyntheticMedia: true`, already set).
+### How the hard limits are solved
+1. **Vocal quality** — ACE-Step 1.5 (best free commercial option) + 2 takes per song + automatic rejection
+   (clipping, noise, dropouts, muffled sound, weak bass, phase, lyric intelligibility via Whisper).
+2. **Volume** — quality over quantity: 1 single, 3 Shorts and one brand-new 1-hour mix per week
+   (genre rotates weekly). This uses ~2 of Kaggle's ~30 free GPU hours, leaving huge headroom.
+3. **Public publishing on day one** — Upload-Post's free API (10 uploads/month) posts publicly and on
+   schedule through its own approved YouTube app. Your own YouTube API project takes over (unlimited)
+   once Google's free audit approves it (`youtube.audited: true`).
+4. **No livestreaming** — not needed: the hour mix is a normal video labelled "(Pre-recorded)".
+5. **GitHub terms** — the weekly volume keeps Actions usage light (≈ 2–3 h/week); the Dockerfile can
+   move everything to any PC.
+6. **Free tiers changing** — backup chains: lyrics GitHub Models → Gemini → Groq → OpenRouter →
+   Cloudflare; publishing own API → Upload-Post; if all are unavailable the work waits, never faked.
+7. **Monetization** — see [docs/STRATEGY.md](docs/STRATEGY.md).
 
 ### Best open-source approach for natural male vocals
 **ACE-Step 1.5** (XL-turbo checkpoint, fallback to SFT) via the official `diffusers` `AceStepPipeline`:
@@ -58,10 +50,11 @@ weights**), YuE (needs 24 GB+), Stable Audio Open (no vocals, licence thresholds
 ## 2. How it works
 
 ```
-06:10 Kigali  Produce  → unique briefs → lyrics (LLM + cliché/repetition/history checks) → Kaggle GPU batch
+06:10 daily   Produce  → (Mon: single) + 3 tracks for this week's mix → unique briefs → lyrics (LLM + cliché/repetition/history checks) → Kaggle GPU batch
 every 2 h     Collect  → download takes → QC score → reject/accept → master (-14 LUFS, -1 dBTP, 24-bit/48 kHz)
-                         → store original + master → singles: lyric-synced vinyl video + thumbnail → YouTube
-15:40 Kigali  Mixes    → per department: ~60 min crossfaded mix + chapters → looping vinyl video → YouTube
+                         → store original + master → single video + 3 vertical Shorts → publish queue
+Sunday 15:40  Mix      → this week's genre: ~60 min of new songs, chapters, looping vinyl video
+Publishing    single Fri 18:00 · Shorts Tue/Thu/Sat 17:00 · mix Sun 20:00 (Kigali)
 Sunday        Maintenance → prune old originals, DB backup, heartbeat commit
 after each    Pages    → dashboard snapshot
 ```

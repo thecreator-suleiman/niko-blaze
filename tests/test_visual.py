@@ -22,3 +22,14 @@ def test_mix_video_loops(tmp):
     ffmpeg("-i", str(tmp / "m.wav"), "-c:a", "aac", "-b:a", "192k", str(tmp / "m.m4a"))
     out = render.render_mix("relaxation", "1 Hour Relaxation Mix", tmp / "m.m4a", 40.0, tmp / "mix.mp4", "1 HOUR")
     assert abs(probe_duration(out) - 40.0) < 1.0
+
+
+def test_short_vertical(tmp):
+    a = synth(tmp / "a.wav", 70)
+    lines = [{"text": "We go rise again", "start": 12.0, "end": 14.0,
+              "words": [("We", 12, 12.3), ("go", 12.3, 12.6), ("rise", 12.6, 13.2), ("again", 13.2, 14)]}]
+    out = render.render_short("afrobeats", "Tomatoes At Dawn", a, lines, 10.0, 20.0, tmp / "s.mp4", preset="ultrafast")
+    import subprocess
+    wh = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+                         "-of", "csv=p=0", str(out)], capture_output=True, text=True).stdout.strip()
+    assert wh == "1080,1920" and abs(probe_duration(out) - 20) < 0.3

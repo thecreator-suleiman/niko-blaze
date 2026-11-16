@@ -1,12 +1,13 @@
 # Operations
 
-## Daily schedule (Africa/Kigali)
-| Time | Workflow | What happens |
-|---|---|---|
-| 06:10 | Produce | Briefs + lyrics, GPU batch sent to Kaggle (skipped if paused or quota low) |
-| every 2 h, 08:25–00:25 | Collect | Finished takes → QC → master → store → single videos → upload |
-| 15:40 | Hour mixes | Reggae, Afrobeats, Relaxation mixes (when libraries are big enough) |
-| Sunday 04:00 | Maintenance | Prune old originals, weekly DB backup, heartbeat commit |
+## Weekly rhythm (Africa/Kigali)
+| When | What |
+|---|---|
+| Daily 06:10 | Produce: Monday adds the week's single; Mon–Sat add 3 tracks for this week's mix |
+| Every 2 h | Collect: QC → master → videos/Shorts → publish queue |
+| Sunday 15:40 | Build this week's 1-hour mix (reggae → afrobeats → relaxation rotation) |
+| Publishing | Single Fri 18:00 · Shorts Tue/Thu/Sat 17:00 · Mix Sun 20:00 |
+| Sunday 04:00 | Maintenance + heartbeat |
 
 ## Manual controls
 Dashboard buttons, or *Actions → Control (manual) → Run workflow* with an action:
@@ -31,7 +32,7 @@ Dashboard buttons, or *Actions → Control (manual) → Run workflow* with an ac
 | "KAGGLE_USERNAME / KAGGLE_KEY secrets are not set" | Add the secrets (SETUP step 2). |
 | Kaggle batch `error` | Open kaggle.com → Code → `niko-blaze-gen` → log. Often: phone not verified, or the GPU type is unavailable (edit `machine_shape` in `nikoblaze/music/providers.py`). |
 | YouTube `invalid_grant` | Refresh token expired/revoked: repeat SETUP step 4.4. Make sure the consent screen is *In production*. |
-| Uploads stay private | Expected until the YouTube API audit is approved. |
+| "no publisher available" | Upload-Post monthly free limit used; videos wait for next month or the API audit. |
 | Thumbnail warning | Verify the channel by phone (youtube.com/verify). |
 | Scheduled runs stopped | GitHub disables schedules after 60 idle days; run Maintenance once manually. |
 

@@ -5,12 +5,12 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageOps
 
 from . import assets
-from .style import PALETTES, font
+from .style import pal, variant_seed, font
 
 
 def make(dept: str, title: str, out: Path, badge: str | None = None) -> Path:
     W, H = 1280, 720
-    p = PALETTES[dept]
+    p = pal(dept)
     portrait, _ = assets.load_portrait()
     img = assets.background(dept, (W, H), portrait=portrait)
     rec = assets.vinyl(dept, 560)

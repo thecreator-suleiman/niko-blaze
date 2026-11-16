@@ -19,6 +19,12 @@ PROVIDERS = {
         "env": "GEMINI_API_KEY",      # free key from aistudio.google.com (no card)
         "model_cfg": "lyrics.gemini_model",
     },
+    "groq": {"url": "https://api.groq.com/openai/v1/chat/completions", "env": "GROQ_API_KEY",
+             "model_cfg": "lyrics.groq_model"},
+    "openrouter": {"url": "https://openrouter.ai/api/v1/chat/completions", "env": "OPENROUTER_API_KEY",
+                   "model_cfg": "lyrics.openrouter_model"},
+    "cloudflare": {"url": "https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/v1/chat/completions",
+                   "env": "CF_API_TOKEN", "model_cfg": "lyrics.cloudflare_model"},
 }
 
 
@@ -38,10 +44,11 @@ def chat(messages: list, temperature: float = 0.95) -> tuple[str, str]:
         p = PROVIDERS[name]
         for attempt in range(2):
             try:
-                r = requests.post(p["url"], timeout=120, headers={
+                url = p["url"].replace("{CF_ACCOUNT_ID}", os.environ.get("CF_ACCOUNT_ID", ""))
+                r = requests.post(url, timeout=120, headers={
                     "Authorization": f"Bearer {os.environ[p['env']]}", "Content-Type": "application/json"},
                     json={"model": cfg(p["model_cfg"]), "messages": messages, "temperature": temperature})
-                if r.status_code == 429:
+                if r.status_code in (402, 429):
                     errors.append(f"{name}: rate limited (free tier exhausted for now)")
                     break
                 r.raise_for_status()

@@ -22,6 +22,24 @@ components:
     source: https://ai.google.dev/gemini-api/terms
     notes: Free-tier prompts may be used by Google to improve products. Confirm terms, then set verified.
     status: pending_owner_review
+  lyrics:groq:
+    what: Lyric drafting via Groq free tier (backup)
+    licence: Groq free tier terms + model licence (Llama 3.3 Community Licence)
+    commercial_use: owner_must_confirm
+    source: https://groq.com/terms-of-use
+    status: pending_owner_review
+  lyrics:openrouter:
+    what: Lyric drafting via OpenRouter free models (backup)
+    licence: OpenRouter free models terms + model licence (Llama 3.3 Community Licence)
+    commercial_use: owner_must_confirm
+    source: https://openrouter.ai/terms
+    status: pending_owner_review
+  lyrics:cloudflare:
+    what: Lyric drafting via Cloudflare Workers AI free allocation (backup)
+    licence: Cloudflare Workers AI free allocation terms + model licence (Llama 3.3 Community Licence)
+    commercial_use: owner_must_confirm
+    source: https://www.cloudflare.com/service-specific-terms-developer-platform/
+    status: pending_owner_review
   transcription:faster-whisper:
     what: Lyric timing/intelligibility check (not published content)
     licence: MIT (faster-whisper), MIT (Whisper weights)

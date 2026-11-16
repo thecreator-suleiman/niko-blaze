@@ -11,8 +11,8 @@ from .config import cfg, work_dir
 
 
 def select_tracks(dept: str) -> list:
-    target = cfg("daily.mix_target_minutes", 60) * 60
-    cooldown = (datetime.now(timezone.utc) - timedelta(days=cfg("daily.track_reuse_cooldown_days", 10))) \
+    target = cfg("schedule.mix_target_minutes", 60) * 60
+    cooldown = (datetime.now(timezone.utc) - timedelta(days=cfg("schedule.track_reuse_cooldown_days", 10))) \
         .strftime("%Y-%m-%dT%H:%M:%SZ")
     rows = db.get().execute(
         "SELECT * FROM songs WHERE department=? AND status IN ('ready','published') AND master_asset IS NOT NULL "
@@ -34,7 +34,7 @@ def build(dept: str) -> dict | None:
     tracks = select_tracks(dept)
     xf = 8 if dept == "relaxation" else 4
     est = sum((t["master_duration"] or t["duration"]) for t in tracks) - xf * max(0, len(tracks) - 1)
-    if est < cfg("daily.mix_min_minutes", 50) * 60 or len(tracks) < 3:
+    if est < cfg("schedule.mix_min_minutes", 50) * 60 or len(tracks) < 3:
         db.log("warn", "mix", f"{dept}: library too small for a mix ({est / 60:.0f} min available) — skipped")
         return None
     ids = [t["id"] for t in tracks]

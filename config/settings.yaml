@@ -16,13 +16,15 @@ generation:
   batch_overhead_seconds: 900   # install + model download per Kaggle run
   batch_timeout_hours: 11
 
-daily:
-  singles: {department: afrobeats, count: 2}      # published as individual videos
-  library_additions: {reggae: 3, relaxation: 3, afrobeats: 1}  # tracks that feed the hour mixes
-  mixes: [reggae, afrobeats, relaxation]
+schedule:                     # quality over quantity (YouTube "inauthentic content" safe)
+  single_department: afrobeats
+  single_days: [Mon]          # a new single is generated on these days (published Friday)
+  mix_rotation: [reggae, afrobeats, relaxation]   # one 1-hour mix per week, genre rotates weekly
+  mix_tracks_per_day: 3       # new tracks/day for this week's mix -> ~100% new music every mix
+  shorts_per_single: 3        # chorus Shorts cut from each single, spread over the week
   mix_target_minutes: 60
-  mix_min_minutes: 50         # below this the mix is skipped, never padded with repeats in one video
-  track_reuse_cooldown_days: 10
+  mix_min_minutes: 50
+  track_reuse_cooldown_days: 60
 
 durations:                    # seconds
   afrobeats: {min: 140, max: 235}
@@ -44,23 +46,33 @@ mastering:
   aac_bitrate: 384k
 
 lyrics:
-  providers: [github_models, gemini]   # both free tiers; if none works vocal songs are skipped (no filler lyrics)
+  providers: [github_models, gemini, groq, openrouter, cloudflare]   # free tiers, tried in order
   github_model: openai/gpt-4.1-mini
   gemini_model: gemini-2.5-flash
+  groq_model: llama-3.3-70b-versatile
+  openrouter_model: meta-llama/llama-3.3-70b-instruct:free
+  cloudflare_model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
   max_rewrites: 3
   history_similarity_max: 0.18
 
+publishing:
+  # Order of publishers. upload_post works immediately (public, free 10 uploads/month).
+  # youtube_api is unlimited but stays private until Google's free audit is approved (then set audited: true).
+  order: [youtube_api_audited, upload_post, youtube_api_private]
+  upload_post_monthly_limit: 10
+  max_per_week: {single: 1, mix: 1, short: 3}
+  publish_days: {single: Fri, mix: Sun, short: [Tue, Thu, Sat]}
+
 youtube:
+  audited: false            # set true when Google approves your API audit
   enabled: false            # turn on after setup (docs/SETUP.md)
   privacy: private          # private | unlisted | public | scheduled  (unverified API projects: private only)
-  schedule_local_times: {single: ["12:00", "18:00"], mix: "20:00"}
-  max_uploads_per_day: 6
+  schedule_local_times: {single: "18:00", mix: "20:00", short: "17:00"}
+  max_uploads_per_day: 4
   category_id: "10"         # Music
   contains_synthetic_media: true   # YouTube altered/synthetic content disclosure — never set false
   set_thumbnails: true      # needs a phone-verified channel
 
-livestream:
-  enabled: false            # needs a persistent machine; never run on GitHub Actions (see docs)
 
 storage:
   release_prefix: media

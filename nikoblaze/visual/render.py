@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw
 
 from ..audio.analysis import ffmpeg
 from . import assets
-from .style import PALETTES, ass_font_name, font
+from .style import pal, variant_seed, ass_font_name, font
 
 W, H, FPS = 1920, 1080, 30
 RPM = 100 / 3  # 33 1/3
@@ -25,7 +25,7 @@ def _ass_color(rgb, alpha=0):
 
 
 def lyrics_ass(lines: list[dict], dept: str, path: Path, duration: float):
-    p = PALETTES[dept]
+    p = pal(dept)
     fn = ass_font_name()
     head = f"""[Script Info]
 ScriptType: v4.00+
@@ -63,7 +63,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 def _compose(dept: str, title: str, subtitle: str, out_dir: Path, badge: str | None = None):
     """Writes base.png (static), vinyl.png (rotating), top.png (sheen+tonearm). Returns vinyl position."""
-    p = PALETTES[dept]
+    p = pal(dept)
     portrait, _ = assets.load_portrait()
     bg = assets.background(dept, portrait=portrait)
     card = assets.portrait_card(portrait, 520, p["accent"])
@@ -106,7 +106,7 @@ def render_song(dept: str, title: str, audio: Path, lines: list[dict], duration:
     vx, vy = _compose(dept, title, "Niko Blaze · Original Song", tmp)
     ass = tmp / "lyrics.ass"
     lyrics_ass(lines, dept, ass, duration)
-    acc = "0x%02X%02X%02X" % PALETTES[dept]["accent"]
+    acc = "0x%02X%02X%02X" % pal(dept)["accent"]
     graph = (_rotate_graph(vx, vy) +
              f";[3:a]showwaves=s=960x44:mode=cline:draw=full:rate={FPS}:colors={acc}@0.85,format=rgba[wav];"
              f"[b2][wav]overlay=x=480:y=1028:format=rgb[b3];[b3]ass='{ass.as_posix()}'[v]")
@@ -134,4 +134,46 @@ def render_mix(dept: str, title: str, audio_m4a: Path, duration: float, out: Pat
            "-pix_fmt", "yuv420p", str(loop))
     ffmpeg("-stream_loop", "-1", "-i", str(loop), "-i", str(audio_m4a), "-map", "0:v", "-map", "1:a",
            "-c", "copy", "-t", f"{duration:.3f}", "-movflags", "+faststart", str(out))
+    return out
+
+
+def render_short(dept: str, title: str, audio: Path, lines: list[dict], start: float, length: float,
+                 out: Path, preset="medium") -> Path:
+    """Vertical 1080x1920 YouTube Short of the chorus (<= 50 s) with spinning vinyl and synced lyrics."""
+    SW, SH = 1080, 1920
+    p = pal(dept)
+    tmp = out.parent / (out.stem + "_layers")
+    tmp.mkdir(parents=True, exist_ok=True)
+    portrait, _ = assets.load_portrait()
+    bg = assets.background(dept, (SW, SH), portrait=portrait)
+    bg.alpha_composite(assets.portrait_card(portrait, 300, p["accent"]), (SW // 2 - 190, 170))
+    d = ImageDraw.Draw(bg)
+    d.text((SW // 2, 90), "NIKO BLAZE", font=font(64), fill=(255, 255, 255), anchor="mm")
+    y = 590
+    for line in textwrap.wrap(title, 20)[:2]:
+        d.text((SW // 2, y), line, font=font(58), fill=p["accent"], anchor="mm", stroke_width=3, stroke_fill=(0, 0, 0))
+        y += 70
+    bg.convert("RGB").save(tmp / "base.png")
+    V = 820
+    assets.vinyl(dept, V).save(tmp / "vinyl.png")
+    top = Image.new("RGBA", (SW, SH), (0, 0, 0, 0))
+    vx, vy = (SW - V) // 2, 760
+    top.alpha_composite(assets.sheen(V), (vx, vy))
+    top.save(tmp / "top.png")
+    seg = [{**l, "start": l["start"] - start, "end": l["end"] - start,
+            "words": [(w, s - start, e - start) for w, s, e in l["words"]]}
+           for l in lines if start <= l["start"] < start + length - 1]
+    ass = tmp / "lyrics.ass"
+    lyrics_ass(seg, dept, ass, length)
+    txt = ass.read_text().replace(f"PlayResX: {W}", f"PlayResX: {SW}").replace(f"PlayResY: {H}", f"PlayResY: {SH}")
+    txt = txt.replace(",80,80,118,1", ",60,60,180,1").replace(",80,80,66,1", ",60,60,110,1")
+    ass.write_text(txt)
+    graph = _rotate_graph(vx, vy) + f";[b2]ass='{ass.as_posix()}'[v];[3:a]afade=t=in:d=0.5,afade=t=out:st={length - 1.5}:d=1.5[a]"
+    ffmpeg("-loop", "1", "-framerate", str(FPS), "-i", str(tmp / "base.png"),
+           "-loop", "1", "-framerate", str(FPS), "-i", str(tmp / "vinyl.png"),
+           "-loop", "1", "-framerate", str(FPS), "-i", str(tmp / "top.png"),
+           "-ss", f"{start:.2f}", "-t", f"{length:.2f}", "-i", str(audio), "-filter_complex", graph,
+           "-map", "[v]", "-map", "[a]", "-t", f"{length:.2f}", "-r", str(FPS), "-c:v", "libx264", "-preset", preset,
+           "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "320k", "-ar", "48000",
+           "-movflags", "+faststart", str(out))
     return out
