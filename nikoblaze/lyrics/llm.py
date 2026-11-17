@@ -25,6 +25,15 @@ PROVIDERS = {
                    "model_cfg": "lyrics.openrouter_model"},
     "cloudflare": {"url": "https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/v1/chat/completions",
                    "env": "CF_API_TOKEN", "model_cfg": "lyrics.cloudflare_model"},
+    # extra free backups (no card). Each is used only if its secret exists; tried in lyrics.providers order.
+    "mistral": {"url": "https://api.mistral.ai/v1/chat/completions", "env": "MISTRAL_API_KEY",
+                "model_cfg": "lyrics.mistral_model"},
+    "cerebras": {"url": "https://api.cerebras.ai/v1/chat/completions", "env": "CEREBRAS_API_KEY",
+                 "model_cfg": "lyrics.cerebras_model"},
+    "sambanova": {"url": "https://api.sambanova.ai/v1/chat/completions", "env": "SAMBANOVA_API_KEY",
+                  "model_cfg": "lyrics.sambanova_model"},
+    "nvidia": {"url": "https://integrate.api.nvidia.com/v1/chat/completions", "env": "NVIDIA_API_KEY",
+               "model_cfg": "lyrics.nvidia_model"},
 }
 
 
@@ -48,6 +57,9 @@ def chat(messages: list, temperature: float = 0.95) -> tuple[str, str]:
                 r = requests.post(url, timeout=120, headers={
                     "Authorization": f"Bearer {os.environ[p['env']]}", "Content-Type": "application/json"},
                     json={"model": cfg(p["model_cfg"]), "messages": messages, "temperature": temperature})
+                if r.status_code in (401, 403, 404):
+                    errors.append(f"{name}: key/model rejected ({r.status_code}) — skipped")
+                    break
                 if r.status_code in (402, 429):
                     errors.append(f"{name}: rate limited (free tier exhausted for now)")
                     break

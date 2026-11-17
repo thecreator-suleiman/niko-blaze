@@ -40,6 +40,31 @@ components:
     commercial_use: true
     source: https://www.cloudflare.com/service-specific-terms-developer-platform/
     status: verified
+  lyrics:mistral:
+    what: Lyric drafting via Mistral free tier (backup)
+    licence: Mistral terms; outputs belong to the user
+    commercial_use: true
+    source: https://mistral.ai/terms
+    status: verified
+  lyrics:cerebras:
+    what: Lyric drafting via Cerebras free tier (backup)
+    licence: Cerebras terms + Llama 3.3 Community Licence
+    commercial_use: true
+    source: https://www.cerebras.ai/terms-of-service
+    status: verified
+  lyrics:sambanova:
+    what: Lyric drafting via SambaNova free tier (backup)
+    licence: SambaNova terms + Llama 3.3 Community Licence
+    commercial_use: true
+    source: https://sambanova.ai/terms-and-conditions
+    status: verified
+  lyrics:nvidia:
+    what: Lyric drafting via NVIDIA API catalog free tier (backup)
+    licence: NVIDIA API trial terms (prototyping) + Llama 3.3 Community Licence
+    commercial_use: owner_must_confirm
+    source: https://build.nvidia.com
+    notes: NVIDIA's free endpoints are for prototyping; kept last in the chain.
+    status: verified
   transcription:faster-whisper:
     what: Lyric timing/intelligibility check (not published content)
     licence: MIT (faster-whisper), MIT (Whisper weights)

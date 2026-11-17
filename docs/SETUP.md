@@ -68,3 +68,14 @@ In `config/settings.yaml` set `youtube.enabled: true`.
 5. Mixes start automatically once each department has ≥ 50 minutes of approved songs.
 
 Everything then runs daily without you. See OPERATIONS.md for controls and troubleshooting.
+
+## 4d. Extra free lyric backups (optional, no card — add any you like)
+The system tries lyric AIs in order and skips any that fail or are out of free quota.
+- Mistral: console.mistral.ai → API Keys → secret `MISTRAL_API_KEY`
+- Cerebras: cloud.cerebras.ai → API Keys → secret `CEREBRAS_API_KEY`
+- SambaNova: cloud.sambanova.ai → API Keys → secret `SAMBANOVA_API_KEY`
+- NVIDIA: build.nvidia.com → Get API Key → secret `NVIDIA_API_KEY`
+
+## Expiring keys
+List any key with an expiry date under `expiring_credentials` in config/settings.yaml.
+Telegram reminds you every day from `remind_from` until it is renewed.

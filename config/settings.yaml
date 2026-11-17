@@ -46,12 +46,16 @@ mastering:
   aac_bitrate: 384k
 
 lyrics:
-  providers: [github_models, gemini, groq, openrouter, cloudflare]   # free tiers, tried in order
+  providers: [github_models, groq, cerebras, mistral, openrouter, cloudflare, sambanova, nvidia, gemini]   # free tiers, auto-failover in this order
   github_model: openai/gpt-4.1-mini
   gemini_model: gemini-2.5-flash
   groq_model: llama-3.3-70b-versatile
   openrouter_model: meta-llama/llama-3.3-70b-instruct:free
   cloudflare_model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+  mistral_model: mistral-small-latest
+  cerebras_model: llama-3.3-70b
+  sambanova_model: Meta-Llama-3.3-70B-Instruct
+  nvidia_model: meta/llama-3.3-70b-instruct
   max_rewrites: 3
   history_similarity_max: 0.18
 
@@ -77,3 +81,9 @@ youtube:
 storage:
   release_prefix: media
   keep_originals_days: 60   # originals are pruned after this; masters are kept
+
+# Keys that expire. From remind_from onward, Telegram sends a reminder every day until you
+# replace the key and update `expires` here (or delete the entry).
+expiring_credentials:
+  - {secret: OPENROUTER_API_KEY, service: OpenRouter, expires: 2027-05-16, remind_from: 2027-05-01,
+     renew_at: "https://openrouter.ai/settings/keys"}

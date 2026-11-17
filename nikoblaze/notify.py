@@ -74,3 +74,26 @@ def posted(kind: str, ref: str, meta: dict, video: Path, thumb: Path | None, pri
 
 def problem(msg: str):
     text(f"⚠️ Niko Blaze: {msg}")
+
+
+def credential_reminders(today=None) -> list:
+    """Daily: Telegram reminder for keys close to expiry (config: expiring_credentials)."""
+    from datetime import date
+    from .config import cfg
+    today = today or date.today()
+    sent = []
+    for c in cfg("expiring_credentials", []) or []:
+        exp, start = c["expires"], c["remind_from"]
+        exp = exp if isinstance(exp, date) else date.fromisoformat(str(exp))
+        start = start if isinstance(start, date) else date.fromisoformat(str(start))
+        if today < start:
+            continue
+        left = (exp - today).days
+        state = f"expires in {left} day(s) ({exp})" if left >= 0 else f"EXPIRED on {exp}"
+        msg = (f"⏰ Niko Blaze reminder: your {c['service']} key ({c['secret']}) {state}.\n"
+               f"1) Make a new key: {c.get('renew_at', '')}\n"
+               f"2) Paste it into GitHub secret {c['secret']}\n"
+               f"3) Tell Claude (code 12003800) to update the expiry date so these reminders stop.")
+        text(msg)
+        sent.append(c["secret"])
+    return sent

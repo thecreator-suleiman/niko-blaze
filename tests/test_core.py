@@ -124,3 +124,13 @@ def test_pause_resume():
     assert db.is_paused()
     db.kv_set("paused", False)
     assert not db.is_paused()
+
+
+def test_credential_reminders(monkeypatch):
+    from datetime import date
+    from nikoblaze import notify
+    sent = []
+    monkeypatch.setattr(notify, "text", lambda m: sent.append(m) or True)
+    assert notify.credential_reminders(date(2027, 4, 30)) == []
+    assert notify.credential_reminders(date(2027, 5, 1)) == ["OPENROUTER_API_KEY"]
+    assert "15 day" in sent[0]
