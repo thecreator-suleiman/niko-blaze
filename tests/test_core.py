@@ -105,8 +105,8 @@ def test_capability_matrix_honest():
 
 
 def test_rights_gate():
-    comps = rights.components_for("song", "github_models")
-    assert "lyrics:github_models" in rights.blocked(comps)  # owner must verify first
+    comps = rights.components_for("song", "gemini")
+    assert "lyrics:gemini" in rights.blocked(comps)  # owner must verify first
     assert rights.blocked(["model:ace-step-1.5", "visual:procedural"]) == []
 
 

@@ -75,7 +75,7 @@ def plan(extra: dict | None = None):
         db.log("info", "plan", "setup not finished (generation.provider: none) — nothing planned")
         return
     rng = random.Random(f"{today()}-{datetime.now(timezone.utc).timestamp()}")
-    sch = cfg("schedule")
+    sch = {k: cfg(f"schedule.{k}") for k in ("single_days", "single_department", "mix_tracks_per_day")}
     weekday = datetime.now(TZ).strftime("%a")
     wanted = []
     if weekday in sch["single_days"]:
