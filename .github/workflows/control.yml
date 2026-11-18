@@ -4,7 +4,7 @@ on:
     inputs:
       action:
         type: choice
-        options: [generate-song, generate-mix, retry-production, retry-upload, pause, resume, publish, status, telegram-test, gpu-log]
+        options: [generate-song, generate-mix, retry-production, retry-upload, pause, resume, publish, status, telegram-test, gpu-log, gpu-fetch]
       department:
         type: choice
         default: afrobeats
@@ -47,7 +47,11 @@ jobs:
           case "${{ inputs.action }}" in
             generate-song) python -m nikoblaze generate-song "${{ inputs.department }}" ;;
             generate-mix)  python -m nikoblaze mixes "${{ inputs.department }}" ;;
+            gpu-fetch)     mkdir -p gpu_out && kaggle kernels output "$KAGGLE_USERNAME/niko-blaze-gen" -p gpu_out || true ;;
             *)             python -m nikoblaze "${{ inputs.action }}" ;;
           esac
+      - if: inputs.action == 'gpu-fetch'
+        uses: actions/upload-artifact@v4
+        with: {name: gpu-output, path: gpu_out, retention-days: 3}
       - if: always()
         run: python -m nikoblaze state-push
