@@ -36,17 +36,35 @@ DTYPE = torch.bfloat16 if major >= 8 else torch.float16
 manifest["gpu"] = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
 
 
-def load(model_id, dtype):
+def load(model_id, dtype, sequential=False):
+    """Free GPUs (Kaggle T4 = 15 GB) cannot hold the XL model + long-audio decode at once,
+    so anything under 24 GB keeps idle sub-models in CPU RAM (cpu offload) and decodes in tiles."""
     p = AceStepPipeline.from_pretrained(model_id, torch_dtype=dtype)
     total = torch.cuda.get_device_properties(0).total_memory / 2**30 if torch.cuda.is_available() else 0
-    if total and total < 14:
+    if sequential:
+        p.enable_sequential_cpu_offload()
+    elif total and total < 24:
         p.enable_model_cpu_offload()
     else:
         p = p.to("cuda")
+    for m in ("enable_vae_slicing", "enable_vae_tiling", "enable_attention_slicing"):
+        try:
+            getattr(p, m)()
+        except Exception:
+            pass
+    manifest["offload"] = "sequential" if sequential else ("model" if total < 24 else "none")
     return p
 
 
+def free():
+    import gc
+    gc.collect()
+    torch.cuda.empty_cache()
+
+
 def bad(arr):
+    if arr is None:
+        return True
     return (not np.isfinite(arr).all()) or float(np.abs(arr).max()) < 1e-4
 
 
@@ -57,18 +75,32 @@ for job in JOBS:
         name = f"{job['song_id']}_t{c}.wav"
         t = time.time()
         try:
-            for attempt in range(2):
+            free()
+            arr = None
+            for attempt in range(3):
                 g = torch.Generator("cuda").manual_seed(seed)
-                audio = pipe(prompt=job["caption"], lyrics=job["lyrics"], audio_duration=float(job["duration"]),
-                             vocal_language=job.get("language", "en"), num_inference_steps=CFG["steps"],
-                             bpm=job["bpm"], keyscale=job["keyscale"], timesignature="4", generator=g).audios
+                try:
+                    with torch.inference_mode():
+                        audio = pipe(prompt=job["caption"], lyrics=job["lyrics"],
+                                     audio_duration=float(job["duration"]),
+                                     vocal_language=job.get("language", "en"), num_inference_steps=CFG["steps"],
+                                     bpm=job["bpm"], keyscale=job["keyscale"], timesignature="4",
+                                     generator=g).audios
+                except torch.cuda.OutOfMemoryError:
+                    # out of GPU memory -> reload with the most memory-saving mode and try again
+                    del pipe
+                    free()
+                    pipe = load(active, DTYPE if active == CFG["model_id"] else torch.float16, sequential=True)
+                    continue
                 arr = audio[0].float().cpu().numpy().T  # (samples, channels)
                 if not bad(arr):
                     break
                 if active != CFG["fallback_model_id"]:  # NaN/silence -> switch to fallback model once
                     del pipe
-                    torch.cuda.empty_cache()
+                    free()
                     pipe, active = load(CFG["fallback_model_id"], torch.float16), CFG["fallback_model_id"]
+            if arr is None:
+                raise RuntimeError("GPU out of memory even in low-memory mode")
             if bad(arr):
                 raise RuntimeError("model returned NaN or silence")
             sf.write(os.path.join(OUT, name), arr, pipe.sample_rate, subtype="PCM_24")

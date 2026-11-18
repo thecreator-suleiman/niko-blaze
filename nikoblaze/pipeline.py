@@ -196,7 +196,11 @@ def process_song(sid: str, takes: list, src_dir: Path):
     if not passing:
         reasons = "; ".join(sorted({h for r in results for h in r[0]["hard"] + r[0]["warnings"]})) or "no takes produced"
         _requeue([sid], f"all takes rejected: {reasons}")
-        notify.problem(f"song '{song['title']}' rejected by quality control — regenerating")
+        if results:
+            notify.problem(f"song '{song['title']}' rejected by quality control ({reasons[:200]}) — regenerating")
+        else:
+            notify.problem(f"song '{song['title']}': the GPU produced no audio (technical error, not quality) "
+                           f"— retrying automatically")
         return
     qc, m, al, path = passing[0]
     day = datetime.now(TZ).strftime("%Y%m%d")
