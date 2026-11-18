@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      - run: pip install -q kaggle faster-whisper
+      - run: pip install -q kaggle six faster-whisper
       - run: python -m nikoblaze reminders || true
       - run: python -m nikoblaze plan
       - if: always()
