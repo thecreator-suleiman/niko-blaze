@@ -86,8 +86,27 @@ class KaggleProvider(Provider):
         if "complete" in out:
             return "complete"
         if "error" in out or "cancel" in out:
+            self.last_error = self.error_log()
             return "error"
         return "running"
+
+    def error_log(self) -> str:
+        """Tail of the Kaggle notebook log, so failures can be diagnosed without opening Kaggle."""
+        import tempfile
+        d = Path(tempfile.mkdtemp())
+        try:
+            self._kaggle("kernels", "output", self.slug, "-p", str(d), check=False)
+            logs = list(d.rglob("*.log"))
+            if not logs:
+                return "no log"
+            txt = logs[0].read_text(errors="ignore")
+            try:  # Kaggle logs are JSON lines [{"data": "..."}]
+                txt = "".join(e.get("data", "") for e in json.loads(txt))
+            except Exception:
+                pass
+            return txt[-3000:]
+        except Exception as e:
+            return f"log fetch failed: {e}"
 
     def fetch(self, batch_id, dest):
         dest = Path(dest)

@@ -147,6 +147,7 @@ def collect():
             db.log("info", "collect", f"batch {b['id']} still running ({age_h:.1f} h)")
             continue
         if st != "complete":
+            db.log("error", "collect", f"batch {b['id']} {st}; kaggle log tail:\n{getattr(prov, 'last_error', '')}")
             db.update("batches", "id", b["id"], status="error", finished_at=db.now())
             _requeue(json.loads(b["info"]), f"GPU batch {st}")
             continue
