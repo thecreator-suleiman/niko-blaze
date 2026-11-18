@@ -132,22 +132,25 @@ for job in JOBS:
         duration = float(job["duration"])
         for attempt in range(3):
             free()
+            to_bf16 = False
             try:
                 arr = gen(pipe, job, seed, duration)
                 err = None if not bad(arr) else "model returned NaN or silence"
             except LatentNaN as e:
                 err = str(e)
                 arr = None
-                if DTYPE == torch.float16:  # fp16 overflow on T4 -> reload in bf16 (emulated, slower) once
-                    del pipe
-                    free()
+                if DTYPE == torch.float16:  # fp16 overflows (NaN) on T4 -> convert in place to bf16 once
                     DTYPE = torch.bfloat16
-                    pipe = load(active, DTYPE)
-                    manifest["models_loaded"].append(f"{active} bf16")
-                    continue
+                    to_bf16 = True
             except Exception as e:
                 err = f"{type(e).__name__}: {str(e)[:400]}"
                 arr = None
+            if err is not None and DTYPE == torch.bfloat16 and to_bf16:
+                for n in BIG:  # done outside the except block so no stale references pin GPU memory
+                    getattr(pipe, n).to(dtype=torch.bfloat16)
+                free()
+                manifest["models_loaded"].append(f"{active} -> bf16")
+                continue
             if err is None:
                 break
             free()
