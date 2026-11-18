@@ -96,15 +96,20 @@ class KaggleProvider(Provider):
         d = Path(tempfile.mkdtemp())
         try:
             self._kaggle("kernels", "output", self.slug, "-p", str(d), check=False)
+            head = ""
+            for mf in d.rglob("manifest.json"):
+                m = json.loads(mf.read_text())
+                head = (f"MANIFEST takes={len(m.get('takes', []))} errors={len(m.get('errors', []))} "
+                        f"first_errors={json.dumps(m.get('errors', [])[:2])[:1500]} takes={json.dumps(m.get('takes', [])[:3])[:800]}\n")
             logs = list(d.rglob("*.log"))
             if not logs:
-                return "no log"
+                return head or "no log"
             txt = logs[0].read_text(errors="ignore")
             try:  # Kaggle logs are JSON lines [{"data": "..."}]
                 txt = "".join(e.get("data", "") for e in json.loads(txt))
             except Exception:
                 pass
-            return txt[-3000:]
+            return head + txt[-3000:]
         except Exception as e:
             return f"log fetch failed: {e}"
 
