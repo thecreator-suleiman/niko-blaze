@@ -430,6 +430,9 @@ def daily_mixes(depts=None):
 
 # ------------------------------------------------------------------ maintenance
 def retry_production():
+    """Manual retry (control action): also revives songs abandoned after repeated GPU failures."""
+    with db.tx() as c:
+        c.execute("UPDATE songs SET status='retry', attempts=0 WHERE status='abandoned'")
     rows = db.get().execute("SELECT id FROM songs WHERE status IN ('retry','planned')").fetchall()
     if rows:
         submit([r["id"] for r in rows][:20])
