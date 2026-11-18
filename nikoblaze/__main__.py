@@ -86,6 +86,9 @@ def main(argv=None):
             print("Telegram refused the message: press Start in your bot and check TELEGRAM_CHAT_ID")
             return 1
         print("telegram message sent")
+    elif cmd == "gpu-log":
+        from .music.providers import get_provider
+        print(get_provider("kaggle").error_log())
     elif cmd == "reminders":
         from . import notify
         print("reminders sent:", notify.credential_reminders())
