@@ -158,6 +158,8 @@ def collect():
             continue
         db.update("batches", "id", b["id"], status="complete", finished_at=db.now(),
                   gpu_seconds=man.get("runtime_seconds", 0))
+        db.log("info", "generate", f"batch {b['id']}: gpu={man.get('gpu')} modes={man.get('modes_tried')} "
+                                   f"takes={len(man.get('takes', []))} runtime={man.get('runtime_seconds')}s")
         for err in man.get("errors", []):
             db.log("warn", "generate", f"{err}")
         for sid in json.loads(b["info"]):

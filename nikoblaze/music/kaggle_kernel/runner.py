@@ -36,30 +36,42 @@ DTYPE = torch.bfloat16 if major >= 8 else torch.float16
 manifest["gpu"] = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
 
 
-def load(model_id, dtype, sequential=False):
-    """Free GPUs (Kaggle T4 = 15 GB) cannot hold the XL model + long-audio decode at once,
-    so anything under 24 GB keeps idle sub-models in CPU RAM (cpu offload) and decodes in tiles."""
-    p = AceStepPipeline.from_pretrained(model_id, torch_dtype=dtype)
-    total = torch.cuda.get_device_properties(0).total_memory / 2**30 if torch.cuda.is_available() else 0
-    if sequential:
-        p.enable_sequential_cpu_offload()
-    elif total and total < 24:
-        p.enable_model_cpu_offload()
-    else:
-        p = p.to("cuda")
-    for m in ("enable_vae_slicing", "enable_vae_tiling", "enable_attention_slicing"):
-        try:
-            getattr(p, m)()
-        except Exception:
-            pass
-    manifest["offload"] = "sequential" if sequential else ("model" if total < 24 else "none")
-    return p
+MODES = ["model_offload", "gpu_tiled"]   # tried in order; the one that works is kept for the rest
+manifest["modes_tried"] = []
 
 
 def free():
     import gc
     gc.collect()
-    torch.cuda.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
+def load(model_id, dtype, mode):
+    """Kaggle T4 = 15 GB. ACE-Step XL needs >=12 GB with offload, so first try diffusers model
+    offload; if that breaks (e.g. 'meta tensor') fall back to full-GPU with tiled VAE decode."""
+    p = AceStepPipeline.from_pretrained(model_id, torch_dtype=dtype)
+    if mode == "model_offload":
+        p.enable_model_cpu_offload()
+    else:
+        p = p.to("cuda")
+    for m in ("enable_vae_tiling", "enable_vae_slicing"):
+        try:
+            getattr(p, m)()
+        except Exception:
+            pass
+    manifest["modes_tried"].append(mode)
+    return p
+
+
+def gen(pipe, job, seed):
+    g = torch.Generator("cuda").manual_seed(seed)
+    torch.cuda.reset_peak_memory_stats()
+    with torch.inference_mode():
+        audio = pipe(prompt=job["caption"], lyrics=job["lyrics"], audio_duration=float(job["duration"]),
+                     vocal_language=job.get("language", "en"), num_inference_steps=CFG["steps"],
+                     bpm=job["bpm"], keyscale=job["keyscale"], timesignature="4", generator=g).audios
+    return audio[0].float().cpu().numpy().T  # (samples, channels)
 
 
 def bad(arr):
@@ -68,46 +80,47 @@ def bad(arr):
     return (not np.isfinite(arr).all()) or float(np.abs(arr).max()) < 1e-4
 
 
-pipe, active = load(CFG["model_id"], DTYPE), CFG["model_id"]
+import traceback  # noqa: E402
+
+mode_i = 0
+active = CFG["model_id"]
+pipe = load(active, DTYPE, MODES[mode_i])
 for job in JOBS:
     for c in range(job["candidates"]):
         seed = int(job["seed"]) + c * 7919
         name = f"{job['song_id']}_t{c}.wav"
         t = time.time()
-        try:
+        arr, last_err = None, None
+        while True:
             free()
-            arr = None
-            for attempt in range(3):
-                g = torch.Generator("cuda").manual_seed(seed)
-                try:
-                    with torch.inference_mode():
-                        audio = pipe(prompt=job["caption"], lyrics=job["lyrics"],
-                                     audio_duration=float(job["duration"]),
-                                     vocal_language=job.get("language", "en"), num_inference_steps=CFG["steps"],
-                                     bpm=job["bpm"], keyscale=job["keyscale"], timesignature="4",
-                                     generator=g).audios
-                except torch.cuda.OutOfMemoryError:
-                    # out of GPU memory -> reload with the most memory-saving mode and try again
-                    del pipe
-                    free()
-                    pipe = load(active, DTYPE if active == CFG["model_id"] else torch.float16, sequential=True)
-                    continue
-                arr = audio[0].float().cpu().numpy().T  # (samples, channels)
-                if not bad(arr):
+            try:
+                arr = gen(pipe, job, seed)
+                if bad(arr) and active != CFG["fallback_model_id"]:
+                    raise RuntimeError("NaN/silence")
+                break
+            except Exception as e:  # out of memory, meta tensor, NaN ... -> next mode / fallback model
+                last_err = f"[{MODES[mode_i]}|{active}] {type(e).__name__}: {str(e)[:300]} | " \
+                           f"{traceback.format_exc()[-600:]}"
+                manifest["errors"].append({"song_id": job["song_id"], "take": c, "error": last_err,
+                                           "peak_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2)})
+                del pipe
+                free()
+                if mode_i + 1 < len(MODES):
+                    mode_i += 1
+                elif active != CFG["fallback_model_id"]:
+                    active, mode_i = CFG["fallback_model_id"], 0
+                else:
+                    pipe = load(active, torch.float16, MODES[mode_i])
+                    arr = None
                     break
-                if active != CFG["fallback_model_id"]:  # NaN/silence -> switch to fallback model once
-                    del pipe
-                    free()
-                    pipe, active = load(CFG["fallback_model_id"], torch.float16), CFG["fallback_model_id"]
-            if arr is None:
-                raise RuntimeError("GPU out of memory even in low-memory mode")
-            if bad(arr):
-                raise RuntimeError("model returned NaN or silence")
-            sf.write(os.path.join(OUT, name), arr, pipe.sample_rate, subtype="PCM_24")
-            manifest["takes"].append({"song_id": job["song_id"], "take": c, "file": name, "seed": seed,
-                                      "model": active, "gen_seconds": round(time.time() - t, 1)})
-        except Exception as e:
-            manifest["errors"].append({"song_id": job["song_id"], "take": c, "error": str(e)[:500]})
+                pipe = load(active, DTYPE if active == CFG["model_id"] else torch.float16, MODES[mode_i])
+        if bad(arr):
+            save_manifest()
+            continue
+        sf.write(os.path.join(OUT, name), arr, pipe.sample_rate, subtype="PCM_24")
+        manifest["takes"].append({"song_id": job["song_id"], "take": c, "file": name, "seed": seed,
+                                  "model": active, "mode": MODES[mode_i], "gen_seconds": round(time.time() - t, 1),
+                                  "peak_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2)})
         save_manifest()
 
 # Free the music model, then transcribe takes (word timestamps) on GPU.
