@@ -69,7 +69,7 @@ publishing:
 
 youtube:
   audited: false            # set true when Google approves your API audit
-  enabled: false            # turn on after setup (docs/SETUP.md)
+  enabled: true             # setup done 2026-11-18
   privacy: private          # private | unlisted | public | scheduled  (unverified API projects: private only)
   schedule_local_times: {single: "18:00", mix: "20:00", short: "17:00"}
   max_uploads_per_day: 4

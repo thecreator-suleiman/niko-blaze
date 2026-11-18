@@ -1,3 +1,5 @@
+import os
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 # Niko Blaze GPU runner — executed on a free Kaggle GPU notebook (or any CUDA machine).
 # Generates takes with ACE-Step 1.5 (MIT) via diffusers, then transcribes each take with
 # faster-whisper (MIT) for lyric timing and intelligibility checks.
@@ -55,6 +57,15 @@ def load(model_id, dtype):
     p = AceStepPipeline.from_pretrained(model_id, torch_dtype=dtype)
     p = p.to("cuda")
     p.vae.to(dtype=torch.float32)  # decode in fp32: avoids NaN on T4 fp16
+
+    # Text + condition encoders (~2.4 GB) are only needed before denoising starts: as soon as the
+    # condition encoder has run, move both to CPU RAM so the DiT has room for long songs.
+    def _evict(mod, args, out):
+        p.text_encoder.to("cpu")
+        mod.to("cpu")
+        free()
+        return out
+    p.condition_encoder.register_forward_hook(_evict)
     try:
         p.vae.enable_tiling()
     except Exception:
@@ -70,11 +81,11 @@ def park(pipe, where):
     free()
 
 
-def gen(pipe, job, seed):
+def gen(pipe, job, seed, duration):
     g = torch.Generator("cuda").manual_seed(seed)
     torch.cuda.reset_peak_memory_stats()
     with torch.inference_mode():
-        lat = pipe(prompt=job["caption"], lyrics=job["lyrics"], audio_duration=float(job["duration"]),
+        lat = pipe(prompt=job["caption"], lyrics=job["lyrics"], audio_duration=float(duration),
                    vocal_language=job.get("language", "en"), num_inference_steps=CFG["steps"],
                    bpm=job["bpm"], keyscale=job["keyscale"], timesignature="4", generator=g,
                    output_type="latent").audios
@@ -108,10 +119,11 @@ for job in JOBS:
         name = f"{job['song_id']}_t{c}.wav"
         t = time.time()
         arr, err = None, None
-        for attempt in range(2):
+        duration = float(job["duration"])
+        for attempt in range(3):
             free()
             try:
-                arr = gen(pipe, job, seed)
+                arr = gen(pipe, job, seed, duration)
                 err = None if not bad(arr) else "model returned NaN or silence"
             except Exception as e:
                 err = f"{type(e).__name__}: {str(e)[:400]}"
@@ -119,8 +131,8 @@ for job in JOBS:
             if err is None:
                 break
             free()
-            if attempt == 0 and "out of memory" in err.lower():
-                seed += 1  # transient OOM: try once more
+            if "out of memory" in err.lower():
+                duration = max(90.0, round(duration * 0.8))  # still too long for this GPU -> shorter song
         if err:
             manifest["errors"].append({"song_id": job["song_id"], "take": c, "error": err,
                                        "model": active, "peak_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2)})
@@ -128,7 +140,7 @@ for job in JOBS:
             continue
         sf.write(os.path.join(OUT, name), arr, pipe.sample_rate, subtype="PCM_24")
         manifest["takes"].append({"song_id": job["song_id"], "take": c, "file": name, "seed": seed,
-                                  "model": active, "gen_seconds": round(time.time() - t, 1),
+                                  "model": active, "duration": duration, "gen_seconds": round(time.time() - t, 1),
                                   "peak_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2)})
         save_manifest()
 
