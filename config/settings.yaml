@@ -5,7 +5,7 @@ timezone: Africa/Kigali
 generation:
   provider: kaggle            # Step 2 done (kaggle | local_acestep | none)
   model_id: ACE-Step/acestep-v15-xl-turbo-diffusers   # MIT licence
-  fallback_model_id: ACE-Step/acestep-v15-sft          # MIT licence, used if the primary returns NaN/silence
+  fallback_model_id: ACE-Step/acestep-v15-xl-sft-diffusers   # MIT licence (diffusers format)
   inference_steps: 8          # turbo = 8; raise to 30-50 for sft/base
   candidates_per_song: 2      # generate N takes, keep the best that passes QC
   max_attempts_per_song: 3    # after this, the brief is abandoned (never published)
