@@ -81,7 +81,12 @@ def park(pipe, where):
     free()
 
 
+class LatentNaN(RuntimeError):
+    pass
+
+
 def gen(pipe, job, seed, duration):
+    park(pipe, "cuda")  # make sure every part is back on the GPU (a failed take may have left some on CPU)
     g = torch.Generator("cuda").manual_seed(seed)
     torch.cuda.reset_peak_memory_stats()
     with torch.inference_mode():
@@ -89,6 +94,10 @@ def gen(pipe, job, seed, duration):
                    vocal_language=job.get("language", "en"), num_inference_steps=CFG["steps"],
                    bpm=job["bpm"], keyscale=job["keyscale"], timesignature="4", generator=g,
                    output_type="latent").audios
+        diag = {"lat_finite": bool(torch.isfinite(lat).all()), "lat_absmax": float(lat.float().abs().max())}
+        manifest.setdefault("diag", []).append(diag)
+        if not diag["lat_finite"]:
+            raise LatentNaN(f"latents not finite ({pipe.transformer.dtype})")
         park(pipe, "cpu")
         try:
             audio = pipe.vae.decode(lat.transpose(1, 2).float()).sample.float()
@@ -97,6 +106,7 @@ def gen(pipe, job, seed, duration):
             peak = audio.abs().amax(dim=[1, 2], keepdim=True).clamp(min=1e-6)
             audio = audio * (10.0 ** (-1.0 / 20.0) / peak)
             arr = audio[0].cpu().numpy().T  # (samples, channels)
+            diag["audio_absmax"] = float(np.abs(arr).max()) if np.isfinite(arr).all() else "nan"
         finally:
             del lat
             park(pipe, "cuda")
@@ -125,6 +135,16 @@ for job in JOBS:
             try:
                 arr = gen(pipe, job, seed, duration)
                 err = None if not bad(arr) else "model returned NaN or silence"
+            except LatentNaN as e:
+                err = str(e)
+                arr = None
+                if DTYPE == torch.float16:  # fp16 overflow on T4 -> reload in bf16 (emulated, slower) once
+                    del pipe
+                    free()
+                    DTYPE = torch.bfloat16
+                    pipe = load(active, DTYPE)
+                    manifest["models_loaded"].append(f"{active} bf16")
+                    continue
             except Exception as e:
                 err = f"{type(e).__name__}: {str(e)[:400]}"
                 arr = None
