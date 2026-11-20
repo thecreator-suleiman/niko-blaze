@@ -111,13 +111,20 @@ def _model_lyrics(lyrics: str) -> str:
     return re.sub(r"^\s*\[([A-Za-z\- ]+?)\s*\d*\]\s*$", lambda m: f"[{m.group(1).strip().lower()}]", lyrics, flags=re.M)
 
 
+def _caption(r) -> str:
+    try:  # rebuild from the brief so caption fixes also reach older/re-queued songs
+        return briefs.caption_for(json.loads(r["brief_json"]))
+    except Exception:
+        return r["caption"]
+
+
 def submit(song_ids: list[str]):
     prov = get_provider()
     if prov is None:
         db.log("warn", "generate", "generation.provider is 'none' — songs stay planned")
         return
     rows = [db.get().execute("SELECT * FROM songs WHERE id=?", (i,)).fetchone() for i in song_ids]
-    jobs = [Job(song_id=r["id"], caption=r["caption"], lyrics=_model_lyrics(r["lyrics"]), duration=r["duration"], bpm=r["bpm"],
+    jobs = [Job(song_id=r["id"], caption=_caption(r), lyrics=_model_lyrics(r["lyrics"]), duration=r["duration"], bpm=r["bpm"],
                 keyscale=r["keyscale"], seed=r["seed"] + r["attempts"] * 104729,
                 instrumental=r["department"] == "relaxation", candidates=cfg("generation.candidates_per_song"))
             for r in rows]

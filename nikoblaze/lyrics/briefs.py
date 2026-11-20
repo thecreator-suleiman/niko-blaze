@@ -66,8 +66,16 @@ def make_brief(department: str, rng: random.Random, subgenre: str | None = None)
     raise RuntimeError(f"Could not find an unused brief for {department}; widen themes in departments.py")
 
 
+_DARK = {"light tape warmth": "clear and present", "subtle vinyl texture": "crisp detail",
+         "long reverb": "airy reverb", "soft string pads": "shimmering string pads",
+         "distant piano notes": "clear bell-like piano notes", "warm room": "natural room, clear highs"}
+
+
 def caption_for(b: dict) -> str:
-    """ACE-Step style prompt (max 512 chars)."""
+    """ACE-Step style prompt (max 512 chars). Words that make the model sound muffled are swapped out."""
+    b = dict(b)
+    for k, v in _DARK.items():
+        b["palette"] = (b.get("palette") or "").replace(k, v)
     if b["instrumental"]:
         parts = [b["subgenre"] + " music", b["palette"], f"evokes {b['theme']}", "no vocals",
                  "calm, spacious, crisp high fidelity studio recording, clear detailed highs, airy, natural dynamics"]
