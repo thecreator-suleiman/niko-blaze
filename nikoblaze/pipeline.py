@@ -211,7 +211,14 @@ def collect():
         for err in man.get("errors", []):
             db.log("warn", "generate", f"{err}")
         for sid in json.loads(b["info"]):
-            process_song(sid, [t for t in man["takes"] if t["song_id"] == sid], Path(man["dir"]))
+            try:  # one bad song must never stop the others (or the publishing step)
+                process_song(sid, [t for t in man["takes"] if t["song_id"] == sid], Path(man["dir"]))
+            except Exception as e:
+                db.log("error", "collect", f"{sid}: processing failed: {type(e).__name__}: {str(e)[:400]}")
+                st = db.get().execute("SELECT status FROM songs WHERE id=?", (sid,)).fetchone()
+                if st and st["status"] != "ready":
+                    _requeue([sid], f"processing failed: {e}")
+    repair_singles()
     # Self-healing: if a batch just failed, re-submit straight away (the provider chain skips a sick Kaggle)
     # instead of waiting for tomorrow's plan.
     if retry_now and not db.is_paused() and not db.get().execute(
@@ -281,7 +288,31 @@ def process_song(sid: str, takes: list, src_dir: Path):
               qc_json=json.dumps({"qc": qc, "metrics": m, "master": mm}), align_json=json.dumps(al) if al else None)
     db.log("info", "master", f"{sid} mastered ({mm['lufs']} LUFS, {mm['true_peak']} dBTP) and stored")
     if song["is_single"]:
-        render_single(sid, master_wav)
+        try:
+            render_single(sid, master_wav)
+        except Exception as e:  # audio is safe in storage; repair_singles() re-renders on the next run
+            db.log("error", "render", f"{sid}: render failed, will retry: {type(e).__name__}: {str(e)[:300]}")
+
+
+def repair_singles():
+    """Re-render ready singles whose video or Shorts never got queued (e.g. a crash mid-render)."""
+    n_short = int(cfg("schedule.shorts_per_single", 3))
+    for r in db.get().execute("SELECT id FROM songs WHERE is_single=1 AND status='ready' "
+                              "AND master_asset IS NOT NULL").fetchall():
+        sid = r["id"]
+        have = db.get().execute("SELECT ref_id FROM uploads WHERE ref_id=? OR ref_id LIKE ?",
+                                (sid, f"{sid}#s%")).fetchall()
+        if any(u["ref_id"] == sid for u in have) and len(have) - 1 >= min(1, n_short):
+            continue
+        tries = int(db.kv_get(f"render_tries:{sid}") or 0)
+        if tries >= 3:
+            continue
+        db.kv_set(f"render_tries:{sid}", tries + 1)
+        try:
+            render_single(sid)
+            db.log("info", "render", f"{sid}: repaired (videos re-rendered and queued)")
+        except Exception as e:
+            db.log("error", "render", f"{sid}: repair failed: {type(e).__name__}: {str(e)[:300]}")
 
 
 def render_single(sid: str, master_wav: Path | None = None):

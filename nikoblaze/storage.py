@@ -1,5 +1,6 @@
 """Free media storage on GitHub Releases (assets up to 2 GiB each). Local folder fallback for development."""
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -36,7 +37,7 @@ def ensure_release(tag: str, title: str | None = None):
 
 def upload(tag: str, path: Path, name: str | None = None) -> str:
     """Upload a file; returns 'tag/name'."""
-    name = name or Path(path).name
+    name = re.sub(r"[^A-Za-z0-9._-]", "_", name or Path(path).name)  # gh treats 'file#label' specially
     ensure_release(tag)
     if _gh_ok():
         src = Path(path)
