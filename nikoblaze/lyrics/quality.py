@@ -59,12 +59,6 @@ def title_issues(title: str, lyrics: str = "") -> list[str]:
         bad.append("title looks like a cut-off lyric line; give a short real song title")
     if "," in t:
         bad.append("title must not contain commas")
-    nt = re.sub(r"[^a-z0-9 ]", "", t.lower()).strip()
-    for line in (lyrics or "").splitlines():
-        nl = re.sub(r"[^a-z0-9 ]", "", line.lower()).strip()
-        if len(nt) > 8 and nl.startswith(nt) and len(nl) > len(nt) + 2:
-            bad.append("title is a cut-off lyric line")
-            break
     if words and words[0].lower() in {"but", "and", "so", "or"}:
         bad.append("title must not start with a conjunction")
     return bad
