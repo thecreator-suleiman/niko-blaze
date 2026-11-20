@@ -101,9 +101,9 @@ def _rotate_graph(vx, vy):
 
 
 def render_song(dept: str, title: str, audio: Path, lines: list[dict], duration: float, out: Path,
-                preset="medium", crf=20) -> Path:
+                preset="medium", crf=20, badge: str | None = None) -> Path:
     tmp = out.parent / (out.stem + "_layers")
-    vx, vy = _compose(dept, title, "Niko Blaze · Original Song", tmp)
+    vx, vy = _compose(dept, title, "Niko Blaze · Original Song", tmp, badge=badge)
     ass = tmp / "lyrics.ass"
     lyrics_ass(lines, dept, ass, duration)
     acc = "0x%02X%02X%02X" % pal(dept)["accent"]

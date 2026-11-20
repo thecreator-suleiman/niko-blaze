@@ -50,9 +50,9 @@ DEPARTMENTS = {
                 "afro-pop drums, crisp snare, layered congas, plucked guitar riff, soft synth pads",
                 "afrobeats rhythm, kick and rim pattern, shekere, melodic bass, horn riff"]},
             "amapiano": {"bpm": (110, 116), "palette": [
-                "amapiano log drum bass, shakers, jazzy piano chords, airy pads, soft kicks",
-                "amapiano groove, deep log drum, rimshots, soulful Rhodes, flute melody",
-                "private school amapiano, smooth log drum, saxophone lines, warm keys"]},
+                "amapiano, south african house, log drum bass, shakers, piano stabs, airy pads, four-on-the-floor kick",
+                "amapiano groove, deep log drum, rimshots, synth stabs, flute melody, dance groove",
+                "amapiano, smooth log drum, shaker groove, warm keys, dancefloor energy"]},
         },
         "vocal": ["smooth male tenor, melodic afrobeats phrasing, light ad-libs",
                   "male vocal, warm and confident, call-and-response hooks",

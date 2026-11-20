@@ -60,6 +60,10 @@ def main(argv=None):
                 pipeline.submit([sid])
     elif cmd == "retry-production":
         pipeline.retry_production()
+    elif cmd == "withdraw":  # withdraw <song_id> [reason...]: cancel scheduled posts, reject the song
+        pipeline.cancel_song(args[0], " ".join(args[1:]) or "withdrawn manually")
+    elif cmd == "live-check":
+        pipeline.announce_live()
     elif cmd == "test-backup":  # send waiting songs to the backup generator (checks the failover path)
         rows = db.get().execute("SELECT id FROM songs WHERE status IN ('retry','planned','abandoned')").fetchall()
         with db.tx() as c:

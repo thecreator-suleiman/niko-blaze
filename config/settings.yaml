@@ -76,6 +76,7 @@ publishing:
 
 youtube:
   audited: false            # set true when Google approves your API audit
+  channel_id: UCgrm66gjrw7Xlj2Ys9AsjAA   # @nikoblazeofficial (used for LIVE links via the public feed)
   enabled: true             # setup done 2026-11-18
   privacy: private          # private | unlisted | public | scheduled  (unverified API projects: private only)
   schedule_local_times: {single: "18:00", mix: "20:00", short: "17:00"}

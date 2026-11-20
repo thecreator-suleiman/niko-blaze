@@ -71,6 +71,19 @@ _DARK = {"light tape warmth": "clear and present", "subtle vinyl texture": "cris
          "distant piano notes": "clear bell-like piano notes", "warm room": "natural room, clear highs"}
 
 
+# Strong genre tags first: ACE-Step weighs the start of the prompt most. "not jazz" style negatives don't work,
+# so the anchors name the defining rhythm instead.
+GENRE_ANCHOR = {
+    "afrobeats": "afrobeats, afropop, west african dance rhythm, danceable groove",
+    "amapiano": "amapiano, south african house, log drum, danceable groove",
+    "reggae": "reggae, one drop rhythm, offbeat skank guitar, jamaican",
+    "roots reggae": "roots reggae, one drop rhythm, offbeat skank guitar, jamaican",
+    "lovers rock": "lovers rock reggae, offbeat skank guitar, one drop rhythm",
+    "conscious reggae": "conscious roots reggae, one drop rhythm, offbeat skank guitar, jamaican",
+    "dancehall": "dancehall, jamaican riddim, digital drums",
+}
+
+
 def caption_for(b: dict) -> str:
     """ACE-Step style prompt (max 512 chars). Words that make the model sound muffled are swapped out."""
     b = dict(b)
@@ -80,6 +93,7 @@ def caption_for(b: dict) -> str:
         parts = [b["subgenre"] + " music", b["palette"], f"evokes {b['theme']}", "no vocals",
                  "calm, spacious, crisp high fidelity studio recording, clear detailed highs, airy, natural dynamics"]
     else:
-        parts = [b["subgenre"], b["palette"], b["vocal_style"], b["harmony"], f"mood: {b['arc']}",
+        anchor = GENRE_ANCHOR.get(b["subgenre"], b["subgenre"])
+        parts = [anchor, b["palette"], b["vocal_style"], b["harmony"], f"mood: {b['arc']}",
                  "clear English pronunciation, catchy memorable chorus, professional mix, strong clean bass, warm"]
     return ", ".join(p for p in parts if p)[:512]

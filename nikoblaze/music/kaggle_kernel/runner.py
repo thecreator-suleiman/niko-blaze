@@ -188,6 +188,43 @@ for job in JOBS:
 # Free the music model, then transcribe takes (word timestamps) on GPU.
 del pipe
 free()
+
+# Genre check: a music-audio model (CLAP) listens to each take and scores how well it matches genre labels.
+GENRES = ["afrobeats", "amapiano", "afropop", "reggae", "dancehall", "jazz", "smooth jazz", "blues", "soul",
+          "r&b", "hip hop", "pop", "rock", "house music", "gospel", "classical piano", "ambient", "lo-fi",
+          "country", "latin"]
+try:
+    from transformers import ClapModel, ClapProcessor
+    cm_id = CFG.get("genre_model", "laion/larger_clap_music")
+    cproc = ClapProcessor.from_pretrained(cm_id)
+    cmod = ClapModel.from_pretrained(cm_id).to(DEV).eval()
+    with torch.no_grad():
+        ti = cproc(text=[f"{g} music" for g in GENRES], return_tensors="pt", padding=True).to(DEV)
+        temb = torch.nn.functional.normalize(cmod.get_text_features(**ti), dim=-1)
+    for take in manifest["takes"]:
+        try:
+            a, sr = sf.read(os.path.join(OUT, take["file"]), dtype="float32", always_2d=True)
+            a = a.mean(axis=1)
+            if sr != 48000:
+                from scipy.signal import resample_poly
+                from math import gcd
+                g = gcd(48000, sr)
+                a = resample_poly(a, 48000 // g, sr // g).astype("float32")
+            n = len(a)
+            clips = [a[int(n * f):int(n * f) + 48000 * 10] for f in (0.2, 0.4, 0.6, 0.8)]
+            with torch.no_grad():
+                ai = cproc(audios=clips, sampling_rate=48000, return_tensors="pt").to(DEV)
+                aemb = torch.nn.functional.normalize(cmod.get_audio_features(**ai), dim=-1).mean(0, keepdim=True)
+                sims = (aemb @ temb.T)[0].softmax(-1).tolist()
+            take["genres"] = sorted(([g, round(s, 3)] for g, s in zip(GENRES, sims)), key=lambda x: -x[1])[:5]
+        except Exception as e:
+            manifest["errors"].append({"stage": "genre", "song_id": take["song_id"], "error": str(e)[:300]})
+    del cmod
+    free()
+    save_manifest()
+except Exception as e:
+    manifest["errors"].append({"stage": "genre", "error": str(e)[:300]})
+
 try:
     from faster_whisper import WhisperModel
 

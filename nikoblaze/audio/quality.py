@@ -2,9 +2,28 @@
 from ..config import cfg
 
 
+GENRE_OK = {"afrobeats": {"afrobeats", "amapiano", "afropop", "house music", "dancehall"},
+            "reggae": {"reggae", "dancehall"},
+            "relaxation": {"ambient", "classical piano", "lo-fi"}}
+
+
+def genre_issue(department: str, genres: list | None) -> str | None:
+    """genres = top-5 [label, prob] from the CLAP listener. Fail only if none of the department's
+    genres is in the top 3 — the song must actually sound like what its title and labels say."""
+    ok = GENRE_OK.get(department)
+    if not ok or not genres:
+        return None
+    if any(g in ok for g, _ in genres[:3]):
+        return None
+    return f"wrong genre: sounds like {genres[0][0]} (expected {', '.join(sorted(ok))})"
+
+
 def score_take(m: dict, department: str, instrumental: bool, match_ratio: float | None,
-               recognised_words: int = 0) -> dict:
+               recognised_words: int = 0, genres: list | None = None) -> dict:
     hard, warn, score = [], [], 100.0
+    gi = genre_issue(department, genres)
+    if gi and cfg("quality.genre_check", True):
+        hard.append(gi)
     q = cfg("quality")
     dur = cfg(f"durations.{department}")
     if m.get("nan"):

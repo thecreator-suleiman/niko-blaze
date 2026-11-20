@@ -3,6 +3,8 @@ import hashlib
 import json
 import random
 import shutil
+import os
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -219,6 +221,7 @@ def collect():
                 if st and st["status"] != "ready":
                     _requeue([sid], f"processing failed: {e}")
     repair_singles()
+    announce_live()
     # Self-healing: if a batch just failed, re-submit straight away (the provider chain skips a sick Kaggle)
     # instead of waiting for tomorrow's plan.
     if retry_now and not db.is_paused() and not db.get().execute(
@@ -252,10 +255,10 @@ def process_song(sid: str, takes: list, src_dir: Path):
                 words = None
         al = None if instrumental else align.align(song["lyrics"], words or [], m["duration"])
         ratio = al["match_ratio"] if (al and words is not None) else None
-        qc = quality.score_take(m, dept, instrumental, ratio, len(words or []))
+        qc = quality.score_take(m, dept, instrumental, ratio, len(words or []), t.get("genres"))
         results.append((qc, m, al, path))
         db.log("info", "qc", f"{sid} take {t['take']}: score {qc['score']} passed={qc['passed']} "
-                             f"{'; '.join(qc['hard'] + qc['warnings'])}")
+                             f"{'; '.join(qc['hard'] + qc['warnings'])} genre={(t.get('genres') or [['?']])[0][0]}")
     passing = sorted([r for r in results if r[0]["passed"]], key=lambda r: -r[0]["score"])
     if not passing:
         reasons = "; ".join(sorted({h for r in results for h in r[0]["hard"] + r[0]["warnings"]})) or "no takes produced"
@@ -325,8 +328,10 @@ def render_single(sid: str, master_wav: Path | None = None):
     al = json.loads(song["align_json"]) if song["align_json"] else {"lines": []}
     set_variant(int(hashlib.sha1(sid.encode()).hexdigest(), 16))
     out = wd / f"{sid}.mp4"
-    render.render_song(song["department"], song["title"], Path(master_wav), al["lines"], song["master_duration"], out)
-    thumb = thumbnails.make(song["department"], song["title"], wd / f"{sid}_thumb.jpg")
+    badge = (json.loads(song["brief_json"]).get("subgenre") or "").upper() or None  # the song's real genre
+    render.render_song(song["department"], song["title"], Path(master_wav), al["lines"], song["master_duration"], out,
+                       badge=badge)
+    thumb = thumbnails.make(song["department"], song["title"], wd / f"{sid}_thumb.jpg", badge=badge)
     _queue_upload("single", sid, out, thumb)
     for k, st in enumerate(short_starts(song, al["lines"])):
         short = wd / f"{sid}_short{k}.mp4"
@@ -381,6 +386,87 @@ def _queue_upload(kind: str, ref_id: str, video: Path, thumb: Path, parts: dict 
                   "video_asset=excluded.video_asset, thumb_asset=excluded.thumb_asset, "
                   "status=CASE WHEN uploads.status='uploaded' THEN 'uploaded' ELSE 'pending' END",
                   (kind, ref_id, sha, "pending", v_ref, t_ref, db.now(), db.now()))
+
+
+# ------------------------------------------------------------------ live links
+def _channel_feed() -> list[tuple[str, str]]:
+    """(video_id, title) of the channel's latest uploads from YouTube's public RSS feed (no key, no quota)."""
+    import html
+    import requests
+    cid = db.kv_get("yt_channel_id") or cfg("youtube.channel_id", None)
+    if not cid:
+        handle = cfg("youtube.channel_handle", "@nikoblazeofficial")
+        page = requests.get(f"https://www.youtube.com/{handle}", timeout=30,
+                            headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en"}).text
+        m = re.search(r'"(?:channelId|externalId)":"(UC[\w-]{22})"', page) or \
+            re.search(r"youtube\.com/channel/(UC[\w-]{22})", page)
+        if not m:
+            raise RuntimeError("could not find the channel id")
+        cid = m.group(1)
+        db.kv_set("yt_channel_id", cid)
+    xml = requests.get(f"https://www.youtube.com/feeds/videos.xml?channel_id={cid}", timeout=30).text
+    ids = re.findall(r"<yt:videoId>([\w-]{11})</yt:videoId>", xml)
+    titles = [html.unescape(t) for t in re.findall(r"<entry>.*?<title>(.*?)</title>", xml, re.S)]
+    return list(zip(ids, titles))
+
+
+def _norm(t: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (t or "").lower())
+
+
+def announce_live():
+    """Send "✅ LIVE + link" once each scheduled upload is actually visible on the channel."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    rows = [r for r in db.get().execute("SELECT * FROM uploads WHERE status='uploaded'").fetchall()
+            if not db.kv_get(f"live:{r['ref_id']}") and (r["publish_at"] or "") <= now]
+    if not rows:
+        return
+    try:
+        feed = _channel_feed()
+    except Exception as e:
+        db.log("warn", "live", f"channel feed unavailable: {e}")
+        return
+    for r in rows:
+        hit = next((vid for vid, title in feed if _norm(title) == _norm(r["title"])), None)
+        if hit:
+            db.update("uploads", "id", r["id"], youtube_id=hit)
+            db.kv_set(f"live:{r['ref_id']}", hit)
+            notify.live(r["kind"], r["title"], hit)
+            db.log("info", "live", f"{r['ref_id']} is live: https://youtu.be/{hit}")
+            continue
+        due = datetime.fromisoformat((r["publish_at"] or r["updated_at"]).replace("Z", "+00:00"))
+        if datetime.now(timezone.utc) - due > timedelta(hours=12) and not db.kv_get(f"live_warned:{r['ref_id']}"):
+            db.kv_set(f"live_warned:{r['ref_id']}", True)
+            notify.problem(f"'{r['title']}' was due at {notify.local_time(r['publish_at'])} (Kigali) but is not on "
+                           f"the channel yet. Check app.upload-post.com history.")
+
+
+def cancel_song(sid: str, reason: str):
+    """Pull a song before it goes live: cancel its scheduled Upload-Post jobs (credits come back) and reject it."""
+    import requests
+    song = db.get().execute("SELECT * FROM songs WHERE id=?", (sid,)).fetchone()
+    key = os.environ.get("UPLOADPOST_API_KEY")
+    ups = db.get().execute("SELECT * FROM uploads WHERE ref_id=? OR ref_id LIKE ?", (sid, f"{sid}#%")).fetchall()
+    titles = {_norm(u["title"]) for u in ups if u["title"]}
+    cancelled = 0
+    if key and titles:
+        h = {"Authorization": f"Apikey {key}"}
+        r = requests.get("https://api.upload-post.com/api/uploadposts/schedule", headers=h, timeout=60,
+                         params={"limit": 100})
+        for j in r.json().get("scheduled_posts", []):
+            if _norm(j.get("title")) in titles:
+                d = requests.delete(f"https://api.upload-post.com/api/uploadposts/schedule/{j['job_id']}",
+                                    headers=h, timeout=60)
+                cancelled += d.ok
+    if cancelled:
+        db.add_usage("upload_post", -cancelled, publisher._month())  # refunded slots
+    with db.tx() as c:
+        c.execute("UPDATE uploads SET status='cancelled' WHERE ref_id=? OR ref_id LIKE ?", (sid, f"{sid}#%"))
+        c.execute("UPDATE songs SET status='rejected' WHERE id=?", (sid,))
+    db.log("warn", "publish", f"{sid} withdrawn ({reason}); {cancelled} scheduled posts cancelled")
+    notify.text(f"🛑 Withdrawn before going live: {song['title'] if song else sid}\nReason: {reason}\n"
+                f"{cancelled} scheduled YouTube posts cancelled (upload credits refunded).")
+    return cancelled
 
 
 # ------------------------------------------------------------------ publish

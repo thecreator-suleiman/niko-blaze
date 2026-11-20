@@ -52,10 +52,14 @@ def posted(kind: str, ref: str, meta: dict, video: Path, thumb: Path | None, pri
     if not enabled():
         return
     vid = ref.split(":")[-1]
-    link = f"https://youtu.be/{vid}" if not ref.startswith("uploadpost") else "(link appears in YouTube Studio once processed)"
     tags = " ".join("#" + re.sub(r"\W", "", t) for t in meta["tags"])
-    head = (f"✅ POSTED to YouTube — {kind.upper()}\n{meta['title']}\n"
-            f"Privacy: {privacy}" + (f" · goes live {when} UTC" if when else "") + f"\n{link}")
+    if when or ref.startswith("uploadpost"):
+        # Handed over but not visible yet. A separate "✅ LIVE" message with the real link follows.
+        head = (f"🕒 SCHEDULED — {kind.upper()}\n{meta['title']}\n"
+                + (f"Goes live: {local_time(when)} (Kigali time)\n" if when else "Publishing now…\n")
+                + "You'll get a ✅ LIVE message with the YouTube link once it is on the channel.")
+    else:
+        head = f"✅ LIVE on YouTube — {kind.upper()}\n{meta['title']}\nhttps://youtu.be/{vid}"
     try:
         prev = _preview(Path(video)) if kind != "mix" else None
         if prev:
@@ -70,6 +74,18 @@ def posted(kind: str, ref: str, meta: dict, video: Path, thumb: Path | None, pri
         print(f"[WARN] telegram media: {e}")
         text(head)
     text(f"📝 DESCRIPTION\n{meta['description']}\n\n🏷 TAGS / HASHTAGS\n{tags}")
+
+
+def local_time(iso: str | None) -> str:
+    from datetime import datetime, timedelta
+    if not iso:
+        return ""
+    t = datetime.fromisoformat(iso.replace("Z", "+00:00")) + timedelta(hours=2)  # Kigali = UTC+2, no DST
+    return t.strftime("%a %d %b %Y, %H:%M")
+
+
+def live(kind: str, title: str, video_id: str):
+    text(f"✅ LIVE on YouTube — {kind.upper()}\n{title}\nhttps://youtu.be/{video_id}")
 
 
 def problem(msg: str):
