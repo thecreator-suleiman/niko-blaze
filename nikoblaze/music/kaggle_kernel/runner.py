@@ -190,7 +190,32 @@ del pipe
 free()
 try:
     from faster_whisper import WhisperModel
-    wm = WhisperModel(CFG.get("whisper_model", "large-v3-turbo"), device=DEV, compute_type="float16" if CUDA else "int8")
+
+    def _whisper():
+        name = CFG.get("whisper_model", "large-v3-turbo")
+        if CUDA:
+            try:  # ctranslate2 needs CUDA-12 cuBLAS/cuDNN; Kaggle images may ship another CUDA version
+                subprocess.run([sys.executable, "-m", "pip", "install", "-q", "nvidia-cublas-cu12",
+                                "nvidia-cudnn-cu12==9.*"], check=False, timeout=600)
+                import ctypes
+                import glob
+                import site
+                for pat in ("nvidia/cublas/lib/libcublas*.so.12", "nvidia/cublas/lib/libcublasLt*.so.12",
+                            "nvidia/cudnn/lib/libcudnn*.so.9"):
+                    for sp in site.getsitepackages():
+                        for lib in sorted(glob.glob(os.path.join(sp, pat))):
+                            try:
+                                ctypes.CDLL(lib, mode=ctypes.RTLD_GLOBAL)
+                            except OSError:
+                                pass
+                m = WhisperModel(name, device="cuda", compute_type="float16")
+                list(m.transcribe(np.zeros(16000, dtype="float32"))[0])  # fail now, not on the first take
+                return m
+            except Exception as e:
+                manifest["errors"].append({"stage": "transcribe-gpu", "error": str(e)[:300], "fallback": "cpu"})
+        return WhisperModel(name if not CUDA else "medium", device="cpu", compute_type="int8")
+
+    wm = _whisper()
     for take in manifest["takes"]:
         job = next(j for j in JOBS if j["song_id"] == take["song_id"])
         a, sr = sf.read(os.path.join(OUT, take["file"]), dtype="float32", always_2d=True)
