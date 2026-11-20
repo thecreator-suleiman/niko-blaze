@@ -34,7 +34,7 @@ import torch  # noqa: E402
 from diffusers import AceStepPipeline  # noqa: E402
 
 major, _ = torch.cuda.get_device_capability(0) if torch.cuda.is_available() else (0, 0)
-DTYPE = torch.bfloat16 if major >= 8 else torch.float16
+DTYPE = torch.bfloat16  # fp16 always NaNs with ACE-Step XL (T4 too); bf16 is the official dtype
 manifest["gpu"] = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
 
 
@@ -175,7 +175,14 @@ try:
     wm = WhisperModel(CFG.get("whisper_model", "large-v3-turbo"), device="cuda", compute_type="float16")
     for take in manifest["takes"]:
         job = next(j for j in JOBS if j["song_id"] == take["song_id"])
-        segs, _ = wm.transcribe(os.path.join(OUT, take["file"]), language="en", word_timestamps=True,
+        a, sr = sf.read(os.path.join(OUT, take["file"]), dtype="float32", always_2d=True)
+        a = a.mean(axis=1)
+        if sr != 16000:  # decode ourselves: new PyAV broke faster-whisper's file loader (metadata_errors)
+            from scipy.signal import resample_poly
+            from math import gcd
+            g = gcd(16000, sr)
+            a = resample_poly(a, 16000 // g, sr // g).astype("float32")
+        segs, _ = wm.transcribe(a, language="en", word_timestamps=True,
                                 vad_filter=False, beam_size=5)
         take["words"] = [{"w": w.word.strip(), "s": round(w.start, 2), "e": round(w.end, 2),
                           "p": round(w.probability, 3)} for s in segs for w in (s.words or [])]

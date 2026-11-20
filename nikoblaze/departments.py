@@ -85,16 +85,16 @@ DEPARTMENTS = {
         "label": "Relaxation",
         "subgenres": {
             "study": {"bpm": (60, 76), "palette": [
-                "instrumental, soft felt piano, warm pads, gentle brushes, light tape warmth",
-                "instrumental, mellow electric piano, soft bass, subtle vinyl texture, calm"]},
+                "instrumental, soft felt piano, warm pads, gentle brushes, clear and present",
+                "instrumental, mellow electric piano, soft bass, crisp detail, calm"]},
             "sleep": {"bpm": (50, 62), "palette": [
-                "instrumental, slow ambient piano, long reverb, soft string pads, no drums",
-                "instrumental, drifting synth pads, distant piano notes, deep calm"]},
+                "instrumental, slow ambient piano, airy reverb, shimmering string pads, no drums",
+                "instrumental, drifting synth pads, clear bell-like piano notes, deep calm"]},
             "meditation": {"bpm": (50, 66), "palette": [
                 "instrumental, kalimba, soft drones, wooden flute, gentle rain ambience",
                 "instrumental, mbira patterns, warm pad, soft hand percussion, peaceful"]},
             "calm piano": {"bpm": (58, 72), "palette": [
-                "instrumental, solo grand piano, intimate, expressive dynamics, warm room",
+                "instrumental, solo grand piano, intimate, expressive dynamics, natural room, clear highs",
                 "instrumental, piano and cello duet, slow and tender"]},
         },
         "vocal": [],

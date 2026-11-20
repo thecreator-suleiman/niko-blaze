@@ -70,7 +70,7 @@ def caption_for(b: dict) -> str:
     """ACE-Step style prompt (max 512 chars)."""
     if b["instrumental"]:
         parts = [b["subgenre"] + " music", b["palette"], f"evokes {b['theme']}", "no vocals",
-                 "calm, spacious, high fidelity, natural dynamics"]
+                 "calm, spacious, crisp high fidelity studio recording, clear detailed highs, airy, natural dynamics"]
     else:
         parts = [b["subgenre"], b["palette"], b["vocal_style"], b["harmony"], f"mood: {b['arc']}",
                  "clear English pronunciation, catchy memorable chorus, professional mix, strong clean bass, warm"]

@@ -28,10 +28,17 @@ def score_take(m: dict, department: str, instrumental: bool, match_ratio: float 
             hard.append("stereo phase problem (mono incompatible)")
         elif m["stereo_corr"] < 0:
             score -= 15; warn.append("weak mono compatibility")
-    roll = m.get("rolloff_99_hz", 20000)
-    if roll < 8000:
-        hard.append(f"muffled/band-limited audio (rolloff {roll:.0f} Hz)")
-    elif roll < 11000:
+    # Muffled check, genre-aware: soft piano/ambient is naturally dark, pop/reggae is not.
+    # hf_db = share of energy above 4 kHz in dB (pop mix ~ -12, soft piano ~ -22, broken/muffled < -40).
+    relax = department == "relaxation"
+    hard_db, warn_db = (q.get("hf_db_hard_relax", -42), q.get("hf_db_warn_relax", -32)) if relax else \
+                       (q.get("hf_db_hard", -30), q.get("hf_db_warn", -22))
+    hfdb = m.get("hf_db")
+    if hfdb is None:  # old metrics without hf_db: fall back to rolloff
+        hfdb = 0.0 if m.get("rolloff_99_hz", 20000) >= (3000 if relax else 8000) else hard_db - 1
+    if hfdb < hard_db:
+        hard.append(f"muffled/band-limited audio (energy above 4 kHz {hfdb:.0f} dB)")
+    elif hfdb < warn_db:
         score -= 15; warn.append("dull top end")
     flat = m.get("spectral_flatness", 0)
     if flat > 0.5:

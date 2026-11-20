@@ -78,6 +78,8 @@ def analyze(path) -> dict:
                       "high": band(4000, 12000), "air": band(12000, 20000)}
         cum = np.cumsum(spec) / spec.sum()
         m["rolloff_99_hz"] = float(freqs[np.searchsorted(cum, 0.995)])
+        hf = float(spec[freqs >= 4000].sum() / tot)
+        m["hf_db"] = float(10 * np.log10(hf + 1e-12))  # share of energy above 4 kHz, in dB
         sel = (freqs > 100) & (freqs < 10000)
         flat = np.exp(np.log(Pl[:, sel]).mean(axis=1)) / Pl[:, sel].mean(axis=1)
         m["spectral_flatness"] = float(np.median(flat))
