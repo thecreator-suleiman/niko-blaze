@@ -16,6 +16,8 @@ You write original, human, emotionally specific lyrics. Rules:
 - Each verse line is new. The chorus is short, singable, and has one memorable hook phrase.
 - Lines are 4-12 words. Write the FULL chorus text every time it repeats (no "repeat chorus").
 - Ad-libs go in parentheses on their own line, sparingly.
+The title must be a real, memorable song title of 1-5 words (usually the hook's key phrase), never a cut-off
+lyric line, no commas.
 Return ONLY JSON: {"title": str, "concept": str (one sentence), "hook": str, "lyrics": str}
 where lyrics uses section tags on their own lines like [Verse 1], [Pre-Chorus], [Chorus], [Bridge], [Outro]."""
 
@@ -25,6 +27,23 @@ def _history(department: str, n: int = 60):
         "SELECT title, lyrics FROM songs WHERE lyrics IS NOT NULL AND lyrics != '' ORDER BY created_at DESC LIMIT ?",
         (n,)).fetchall()
     return [(r["title"], r["lyrics"]) for r in rows]
+
+
+def retitle(lyrics: str) -> str:
+    """Ask a free LLM for a proper short song title (used when the given one is missing or a lyric fragment)."""
+    msgs = [{"role": "user", "content": "Give one original, memorable song title (1-5 words, no commas, not a "
+             "cut-off lyric line) for these lyrics. Reply with the title only.\n\n" + lyrics[:3000]}]
+    for _ in range(3):
+        try:
+            t, _p = llm.chat(msgs, temperature=0.7)
+        except Exception:
+            break
+        t = re.sub(r'[<>"*#]', "", (t or "").strip().splitlines()[0] if t and t.strip() else "").strip(" .")
+        if t and not quality.title_issues(t, lyrics):
+            return t[:70]
+    hook = re.search(r"(?im)^\s*\[chorus[^\]]*\]\s*\n\s*([^\n\[]+)", lyrics)
+    words = (hook.group(1) if hook else "Untitled").replace(",", " ").split()
+    return " ".join(w for w in words[:3]).strip(".!?") or "Untitled"
 
 
 def _parse(text: str) -> dict:
@@ -48,11 +67,13 @@ def _parse(text: str) -> dict:
         data = {"title": t.group(1).strip() if t else "", "lyrics": text[start:].strip()}
         if not data["title"]:
             hook = re.search(r"(?im)^\s*\[chorus[^\]]*\]\s*\n\s*([^\n\[]+)", text)
-            data["title"] = " ".join((hook.group(1) if hook else "Untitled").split()[:5]).strip(",.!?")
+            data["title"] = ""  # filled by retitle()
     if not isinstance(data, dict):
         raise ValueError("model did not return JSON")
     if isinstance(data.get("lyrics"), list):
         data["lyrics"] = "\n".join(map(str, data["lyrics"]))
+    if not data.get("title"):
+        data["title"] = retitle(data.get("lyrics") or "")
     for k in ("title", "lyrics"):
         if not data.get(k) or not isinstance(data[k], str):
             raise ValueError(f"missing {k}")

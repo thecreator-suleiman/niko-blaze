@@ -320,6 +320,12 @@ def repair_singles():
 
 def render_single(sid: str, master_wav: Path | None = None):
     song = dict(db.get().execute("SELECT * FROM songs WHERE id=?", (sid,)).fetchone())
+    from .lyrics import engine as lyr_engine, quality as lyr_quality
+    if lyr_quality.title_issues(song["title"], song["lyrics"] or ""):
+        new = lyr_engine.retitle(song["lyrics"] or "")
+        db.log("info", "render", f"{sid}: retitled '{song['title']}' -> '{new}'")
+        db.update("songs", "id", sid, title=new)
+        song["title"] = new
     wd = work_dir("songs", sid)
     if master_wav is None or not Path(master_wav).exists():
         flac = storage.download(song["master_asset"], wd)

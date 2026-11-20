@@ -48,7 +48,7 @@ _DANGLING = {"to", "and", "but", "or", "the", "a", "an", "of", "in", "on", "for"
              "when", "if", "at", "from", "by"}
 
 
-def title_issues(title: str) -> list[str]:
+def title_issues(title: str, lyrics: str = "") -> list[str]:
     """A real song title: 1-6 words, not a cut-off lyric line."""
     t = (title or "").strip()
     words = t.split()
@@ -57,6 +57,14 @@ def title_issues(title: str) -> list[str]:
         bad.append("title must be 1-6 words")
     if t[-1:] in ",;:-" or (words and words[-1].lower().strip(",.!?") in _DANGLING):
         bad.append("title looks like a cut-off lyric line; give a short real song title")
+    if "," in t:
+        bad.append("title must not contain commas")
+    nt = re.sub(r"[^a-z0-9 ]", "", t.lower()).strip()
+    for line in (lyrics or "").splitlines():
+        nl = re.sub(r"[^a-z0-9 ]", "", line.lower()).strip()
+        if len(nt) > 8 and nl.startswith(nt) and len(nl) > len(nt) + 2:
+            bad.append("title is a cut-off lyric line")
+            break
     if words and words[0].lower() in {"but", "and", "so", "or"}:
         bad.append("title must not start with a conjunction")
     return bad
@@ -64,7 +72,7 @@ def title_issues(title: str) -> list[str]:
 
 def check(lyrics: str, title: str, history: list[tuple[str, str]], max_sim: float = 0.18) -> list[str]:
     """Return a list of problems (empty == acceptable). history = [(title, lyrics), ...]."""
-    issues_t = title_issues(title)
+    issues_t = title_issues(title, lyrics)
     if issues_t:
         return issues_t
     issues = []
