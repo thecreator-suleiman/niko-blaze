@@ -1,0 +1,110 @@
+name: Generate on CPU (backup GPU)
+run-name: "cpu-gen ${{ inputs.batch }}"
+# Backup music generator, used automatically when Kaggle fails. Free for public repos, no account needed.
+# One take per parallel job (ACE-Step XL in bf16 fits the 16 GB runner), then one merged artifact named <batch>.
+on:
+  workflow_dispatch:
+    inputs:
+      batch: {required: true, type: string}
+permissions:
+  contents: read
+jobs:
+  prep:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    env: {GH_TOKEN: "${{ github.token }}"}
+    steps:
+      - id: m
+        run: |
+          gh release download gpu-jobs -R "$GITHUB_REPOSITORY" -p "${{ inputs.batch }}.json" -O jobs.json
+          python3 - <<'E' >> "$GITHUB_OUTPUT"
+          import json
+          d = json.load(open("jobs.json"))
+          inc = [{"j": i, "c": c} for i, j in enumerate(d["jobs"]) for c in range(int(j.get("candidates", 1)))]
+          print("matrix=" + json.dumps({"include": inc}))
+          E
+  gen:
+    needs: prep
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix: ${{ fromJSON(needs.prep.outputs.matrix) }}
+    env: {GH_TOKEN: "${{ github.token }}", HF_HUB_DISABLE_PROGRESS_BARS: "1"}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk + add swap
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo fallocate -l 12G /swapfile2 && sudo chmod 600 /swapfile2 && sudo mkswap /swapfile2 && sudo swapon /swapfile2 || true
+          df -h / ; free -g
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: |
+          pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -q diffusers==0.43.0 transformers==5.23.0 accelerate==1.16.0 soundfile scipy faster-whisper==1.2.1
+      - name: Generate take
+        run: |
+          gh release download gpu-jobs -R "$GITHUB_REPOSITORY" -p "${{ inputs.batch }}.json" -O jobs.json
+          python3 - <<'E'
+          import json
+          d = json.load(open("jobs.json"))
+          j = d["jobs"][${{ matrix.j }}]
+          c = ${{ matrix.c }}
+          j["seed"] = int(j["seed"]) + c * 7919   # same seed the GPU runner would use for take c
+          j["candidates"] = 1
+          src = open("nikoblaze/music/kaggle_kernel/runner.py").read()
+          src = src.replace("__JOBS__", json.dumps([j])).replace("__CFG__", json.dumps(d["cfg"]))
+          open("run_take.py", "w").write(src)
+          E
+          python3 run_take.py
+      - name: Tag take index
+        if: always()
+        run: |
+          mkdir -p out
+          python3 - <<'E'
+          import json, os, glob
+          c = ${{ matrix.c }}
+          p = "out/manifest.json"
+          m = json.load(open(p)) if os.path.exists(p) else {"takes": [], "errors": [{"error": "runner crashed"}]}
+          for t in m["takes"]:
+              new = t["file"].replace("_t0.wav", f"_t{c}.wav")
+              if new != t["file"]:
+                  os.rename(f"out/{t['file']}", f"out/{new}")
+              t["file"], t["take"] = new, c
+          for e in m.get("errors", []):
+              e.setdefault("take", c)
+          json.dump(m, open(p, "w"))
+          E
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: {name: "part-${{ matrix.j }}-${{ matrix.c }}", path: out, retention-days: 2, if-no-files-found: warn}
+  merge:
+    needs: gen
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: {pattern: "part-*", path: parts}
+      - run: |
+          mkdir -p merged
+          python3 - <<'E'
+          import json, glob, os, shutil
+          man = {"takes": [], "errors": [], "gpu": "github-cpu", "mode": "gha_cpu", "runtime_seconds": 0}
+          for mf in glob.glob("parts/*/manifest.json"):
+              m = json.load(open(mf))
+              man["model"] = m.get("model", man.get("model"))
+              man["takes"] += m.get("takes", [])
+              man["errors"] += m.get("errors", [])
+              man["runtime_seconds"] = max(man["runtime_seconds"], m.get("runtime_seconds", 0))
+              for t in m.get("takes", []):
+                  shutil.copy(os.path.join(os.path.dirname(mf), t["file"]), "merged/")
+          json.dump(man, open("merged/manifest.json", "w"), indent=1)
+          print(len(man["takes"]), "takes,", len(man["errors"]), "errors")
+          if not man["takes"]:
+              raise SystemExit("no takes produced")
+          E
+      - uses: actions/upload-artifact@v4
+        with: {name: "${{ inputs.batch }}", path: merged, retention-days: 5}

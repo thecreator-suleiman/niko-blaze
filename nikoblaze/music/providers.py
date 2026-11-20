@@ -151,10 +151,73 @@ class LocalAceStepProvider(Provider):
         return man
 
 
+class GhaCpuProvider(Provider):
+    """Backup generator: the same ACE-Step runner on free GitHub Actions CPU runners (public repo = free minutes).
+    No account or key needed. One song per parallel job, so a batch of 6 songs takes ~1.5-3 h instead of ~45 min.
+    Used automatically when Kaggle fails (quota, auth, rule change or repeated errors)."""
+    name = "gha_cpu"
+    capabilities = ACE_STEP
+    WORKFLOW = "gen-cpu.yml"
+
+    def _gh(self, *args, check=True):
+        r = subprocess.run(["gh", *args], capture_output=True, text=True, timeout=1800)
+        if check and r.returncode != 0:
+            raise RuntimeError(f"gh {' '.join(args[:3])} failed: {(r.stderr or r.stdout).strip()[:800]}")
+        return r.stdout
+
+    def submit(self, jobs):
+        from .. import storage
+        if not shutil.which("gh") or not os.environ.get("GITHUB_REPOSITORY"):
+            raise RuntimeError("gha_cpu needs to run inside GitHub Actions (gh + GITHUB_REPOSITORY)")
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        bid = f"gha-{stamp}"
+        d = work_dir("gha_cpu", stamp)
+        conf = {"model_id": cfg("generation.model_id"), "fallback_model_id": cfg("generation.fallback_model_id"),
+                "steps": int(cfg("generation.inference_steps", 8)), "out_dir": "out", "skip_install": True,
+                "whisper_model": cfg("generation.cpu_whisper_model", "small")}
+        (d / f"{bid}.json").write_text(json.dumps({"cfg": conf, "jobs": [j.to_dict() for j in jobs]}))
+        storage.upload("gpu-jobs", d / f"{bid}.json")
+        self._gh("workflow", "run", self.WORKFLOW, "-f", f"batch={bid}")
+        return bid
+
+    def _run(self, batch_id):
+        out = self._gh("run", "list", "--workflow", self.WORKFLOW, "-L", "40", "--json",
+                       "databaseId,displayTitle,status,conclusion", check=False) or "[]"
+        for r in json.loads(out):
+            if batch_id in (r.get("displayTitle") or ""):
+                return r
+        return None
+
+    def poll(self, batch_id):
+        r = self._run(batch_id)
+        if r is None or r["status"] != "completed":
+            return "running"
+        if r["conclusion"] == "success":
+            return "complete"
+        self.last_error = f"GitHub CPU run {r['databaseId']} ended: {r['conclusion']}"
+        return "error"
+
+    def fetch(self, batch_id, dest):
+        dest = Path(dest)
+        dest.mkdir(parents=True, exist_ok=True)
+        r = self._run(batch_id)
+        if r is None:
+            raise RuntimeError(f"no workflow run found for {batch_id}")
+        self._gh("run", "download", str(r["databaseId"]), "-n", batch_id, "-D", str(dest))
+        found = list(dest.rglob("manifest.json"))
+        if not found:
+            raise RuntimeError("CPU run output has no manifest.json")
+        man = json.loads(found[0].read_text())
+        man["dir"] = str(found[0].parent)
+        return man
+
+
 def get_provider(name: str | None = None) -> Provider | None:
     name = name or cfg("generation.provider")
     if name == "kaggle":
         return KaggleProvider()
     if name == "local_acestep":
         return LocalAceStepProvider()
+    if name == "gha_cpu":
+        return GhaCpuProvider()
     return None

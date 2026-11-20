@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  actions: write
   models: read
 concurrency: {group: nikoblaze-state, cancel-in-progress: false}
 jobs:

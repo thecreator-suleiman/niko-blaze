@@ -4,6 +4,10 @@ timezone: Africa/Kigali
 
 generation:
   provider: kaggle            # Step 2 done (kaggle | local_acestep | none)
+  backup_providers: [gha_cpu]  # automatic failover: free GitHub Actions CPU runners, no account needed
+  failover_cooldown_hours: 48  # Kaggle is skipped after 2 failed batches in this window, then retried
+  backup_max_songs: 6          # max songs per backup batch (one parallel job per take)
+  cpu_whisper_model: small     # lyric-timing model on the CPU backup (faster than large-v3-turbo)
   model_id: ACE-Step/acestep-v15-xl-turbo-diffusers   # MIT licence
   fallback_model_id: ACE-Step/acestep-v15-xl-sft-diffusers   # MIT licence (diffusers format)
   inference_steps: 8          # turbo = 8; raise to 30-50 for sft/base
@@ -62,7 +66,10 @@ lyrics:
 publishing:
   # Order of publishers. upload_post works immediately (public, free 10 uploads/month).
   # youtube_api is unlimited but stays private until Google's free audit is approved (then set audited: true).
-  order: [youtube_api_audited, upload_post, youtube_api_private]
+  # youtube_api_private removed: unaudited API uploads are locked private — better to wait in the queue
+  # (they go out next month, or immediately once the free Google audit is approved and audited: true).
+  order: [youtube_api_audited, upload_post]
+  long_uploads_per_week: 2   # single + mix; Shorts only use free Upload-Post slots beyond this reserve
   upload_post_monthly_limit: 10
   max_per_week: {single: 1, mix: 1, short: 3}
   publish_days: {single: Fri, mix: Sun, short: [Tue, Thu, Sat]}

@@ -49,15 +49,33 @@ def upload_post(video, meta, publish_at=None, thumb=None) -> str:
     return "uploadpost:" + str(j.get("request_id") or j.get("job_id") or "ok")
 
 
-def publish(video, meta, publish_at=None, thumb=None) -> tuple[str, str]:
+def _reserve(kind: str) -> int:
+    """Free plan = 10 uploads/month. Shorts may only use a slot if enough are left for the weekly single + mix
+    for the rest of the month (2 per remaining week)."""
+    if kind != "short":
+        return 0
+    from datetime import datetime, timezone
+    import calendar
+    now = datetime.now(timezone.utc)
+    days_left = calendar.monthrange(now.year, now.month)[1] - now.day
+    return int(cfg("publishing.long_uploads_per_week", 2)) * (days_left // 7 + 1)
+
+
+def publish(video, meta, publish_at=None, thumb=None, kind: str = "single") -> tuple[str, str]:
     """Returns (video_ref, privacy)."""
     have_api = all(os.environ.get(k) for k in ("YT_CLIENT_ID", "YT_CLIENT_SECRET", "YT_REFRESH_TOKEN"))
+    errors = []
     for name in cfg("publishing.order", []):
-        if name == "youtube_api_audited" and have_api and cfg("youtube.audited", False):
-            privacy = "scheduled" if publish_at else "public"
-            return yt.upload(video, meta, privacy, publish_at, thumb), privacy
-        if name == "upload_post" and upload_post_left() > 0:
-            return upload_post(video, meta, publish_at, thumb), "public"
-        if name == "youtube_api_private" and have_api:
-            return yt.upload(video, meta, "private", None, thumb), "private"
+        try:  # one publisher failing (API down, key revoked, rule change) must not block the next one
+            if name == "youtube_api_audited" and have_api and cfg("youtube.audited", False):
+                privacy = "scheduled" if publish_at else "public"
+                return yt.upload(video, meta, privacy, publish_at, thumb), privacy
+            if name == "upload_post" and os.environ.get("UPLOADPOST_API_KEY") and upload_post_left() > _reserve(kind):
+                return upload_post(video, meta, publish_at, thumb), "public"
+            if name == "youtube_api_private" and have_api:
+                return yt.upload(video, meta, "private", None, thumb), "private"
+        except Exception as e:
+            errors.append(f"{name}: {str(e)[:300]}")
+    if errors:
+        raise NoPublisher("all publishers failed — queued: " + " | ".join(errors))
     raise NoPublisher("no publisher available right now (monthly free limit used / not configured) — queued")

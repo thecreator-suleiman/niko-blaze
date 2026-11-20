@@ -28,7 +28,7 @@ def today() -> str:
 
 # ------------------------------------------------------------------ capacity
 def gpu_seconds_last_7_days() -> float:
-    r = db.get().execute("SELECT COALESCE(SUM(gpu_seconds),0) s FROM batches WHERE submitted_at >= ?",
+    r = db.get().execute("SELECT COALESCE(SUM(gpu_seconds),0) s FROM batches WHERE provider NOT IN ('gha_cpu','local_acestep') AND submitted_at >= ?",
                          ((datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ"),)).fetchone()
     return r["s"]
 
@@ -91,8 +91,11 @@ def plan(extra: dict | None = None):
     budget = gpu_budget_left() - cfg("generation.batch_overhead_seconds")
     max_songs = int(max(0, budget) // (per_take * cands))
     if max_songs <= 0:
-        db.log("warn", "capacity", "free GPU quota for this week is used up — generation paused until it renews")
-        return
+        if not cfg("generation.backup_providers", ["gha_cpu"]):
+            db.log("warn", "capacity", "free GPU quota for this week is used up — generation paused until it renews")
+            return
+        max_songs = int(cfg("generation.backup_max_songs", 6))
+        db.log("warn", "capacity", f"Kaggle quota used up — using backup generator for up to {max_songs} songs")
     ids = [r["id"] for r in retry][:max_songs]
     for dept, single in wanted:
         if len(ids) >= max_songs:
@@ -118,9 +121,26 @@ def _caption(r) -> str:
         return r["caption"]
 
 
-def submit(song_ids: list[str]):
-    prov = get_provider()
-    if prov is None:
+def provider_chain() -> list[str]:
+    """Primary provider first, then backups. Kaggle is skipped while it is unhealthy (quota/auth/rule
+    change/repeated errors) and comes back automatically once the cool-down has passed."""
+    names = [cfg("generation.provider")] + list(cfg("generation.backup_providers", ["gha_cpu"]) or [])
+    names = [n for i, n in enumerate(names) if n and n != "none" and n not in names[:i]]
+    if "kaggle" in names and len(names) > 1:
+        since = (datetime.now(timezone.utc) - timedelta(hours=cfg("generation.failover_cooldown_hours", 48))) \
+            .strftime("%Y-%m-%dT%H:%M:%SZ")
+        last = db.get().execute("SELECT status FROM batches WHERE provider='kaggle' AND submitted_at >= ? "
+                                "ORDER BY submitted_at DESC LIMIT 2", (since,)).fetchall()
+        sick = len(last) == 2 and all(r["status"] == "error" for r in last)
+        if sick or gpu_budget_left() - cfg("generation.batch_overhead_seconds") <= 0:
+            names.remove("kaggle")
+            names.append("kaggle")  # still the last resort
+    return names
+
+
+def submit(song_ids: list[str], providers: list[str] | None = None):
+    names = providers or provider_chain()
+    if not names:
         db.log("warn", "generate", "generation.provider is 'none' — songs stay planned")
         return
     rows = [db.get().execute("SELECT * FROM songs WHERE id=?", (i,)).fetchone() for i in song_ids]
@@ -128,11 +148,21 @@ def submit(song_ids: list[str]):
                 keyscale=r["keyscale"], seed=r["seed"] + r["attempts"] * 104729,
                 instrumental=r["department"] == "relaxation", candidates=cfg("generation.candidates_per_song"))
             for r in rows]
-    try:
-        bid = prov.submit(jobs)
-    except Exception as e:
-        db.log("error", "generate", f"submit failed: {e}")
+    bid, prov, errs = None, None, []
+    for n in names:
+        try:
+            prov = get_provider(n)
+            bid = prov.submit(jobs)
+            break
+        except Exception as e:
+            errs.append(f"{n}: {str(e)[:300]}")
+            bid = None
+    if bid is None:
+        db.log("error", "generate", "submit failed on every provider: " + " | ".join(errs))
+        notify.text(f"⚠️ Niko Blaze: could not start music generation on any provider.\n" + "\n".join(errs))
         return
+    if errs:
+        db.log("warn", "generate", f"failover to {prov.name}: " + " | ".join(errs))
     with db.tx() as c:
         c.execute("INSERT INTO batches(id,provider,status,submitted_at,info) VALUES(?,?,?,?,?)",
                   (bid, prov.name, "running", db.now(), json.dumps(song_ids)))
@@ -144,10 +174,14 @@ def submit(song_ids: list[str]):
 
 # ------------------------------------------------------------------ collect
 def collect():
-    prov = None
+    prov, retry_now = None, False
     for b in db.get().execute("SELECT * FROM batches WHERE status='running'").fetchall():
-        prov = prov or get_provider(b["provider"])
-        st = prov.poll(b["id"])
+        try:
+            prov = get_provider(b["provider"])
+            st = prov.poll(b["id"])
+        except Exception as e:  # provider broken (e.g. key revoked): fail the batch so songs move to a backup
+            prov, st = None, "error"
+            db.log("error", "collect", f"batch {b['id']}: cannot poll {b['provider']}: {e}")
         age_h = (datetime.now(timezone.utc) - datetime.strptime(b["submitted_at"], "%Y-%m-%dT%H:%M:%SZ")
                  .replace(tzinfo=timezone.utc)).total_seconds() / 3600
         if st == "running" and age_h < cfg("generation.batch_timeout_hours"):
@@ -157,6 +191,7 @@ def collect():
             db.log("error", "collect", f"batch {b['id']} {st}; kaggle log tail:\n{getattr(prov, 'last_error', '')}")
             db.update("batches", "id", b["id"], status="error", finished_at=db.now())
             _requeue(json.loads(b["info"]), f"GPU batch {st}")
+            retry_now = True
             continue
         try:
             man = prov.fetch(b["id"], work_dir("batches", b["id"]))
@@ -172,6 +207,13 @@ def collect():
             db.log("warn", "generate", f"{err}")
         for sid in json.loads(b["info"]):
             process_song(sid, [t for t in man["takes"] if t["song_id"] == sid], Path(man["dir"]))
+    # Self-healing: if a batch just failed, re-submit straight away (the provider chain skips a sick Kaggle)
+    # instead of waiting for tomorrow's plan.
+    if retry_now and not db.is_paused() and not db.get().execute(
+            "SELECT 1 FROM batches WHERE status='running'").fetchone():
+        rows = db.get().execute("SELECT id FROM songs WHERE status='retry'").fetchall()
+        if rows:
+            submit([r["id"] for r in rows][:int(cfg("generation.backup_max_songs", 6))])
     publish_pending()
 
 
@@ -384,7 +426,7 @@ def publish_pending():
             else:
                 video = storage.download(u["video_asset"], wd)
             thumb = storage.download(u["thumb_asset"], wd) if u["kind"] != "short" else None
-            vid, privacy = publisher.publish(video, meta, when, thumb)
+            vid, privacy = publisher.publish(video, meta, when, thumb, kind=u["kind"])
         except (yt.QuotaExhausted, publisher.NoPublisher) as e:
             db.log("warn", "publish", f"{u['ref_id']} waiting: {e}")
             break

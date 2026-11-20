@@ -25,8 +25,8 @@ def save_manifest():
 
 
 if not CFG.get("skip_install"):
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-U", "diffusers>=0.39.0", "transformers",
-                    "accelerate", "soundfile", "faster-whisper"], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-U", "diffusers==0.43.0", "transformers==5.23.0", "accelerate==1.16.0", "soundfile", "scipy",
+                    "faster-whisper==1.2.1"], check=True)
 
 import numpy as np  # noqa: E402
 import soundfile as sf  # noqa: E402
@@ -35,7 +35,11 @@ from diffusers import AceStepPipeline  # noqa: E402
 
 major, _ = torch.cuda.get_device_capability(0) if torch.cuda.is_available() else (0, 0)
 DTYPE = torch.bfloat16  # fp16 always NaNs with ACE-Step XL (T4 too); bf16 is the official dtype
-manifest["gpu"] = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
+CUDA = torch.cuda.is_available()
+DEV = "cuda" if CUDA else "cpu"
+if not CUDA:
+    torch.set_num_threads(os.cpu_count() or 4)
+manifest["gpu"] = torch.cuda.get_device_name(0) if CUDA else "cpu"
 
 
 manifest["mode"] = "gpu_split"  # denoise on GPU -> park big models in CPU RAM -> decode audio on GPU
@@ -44,7 +48,7 @@ manifest["mode"] = "gpu_split"  # denoise on GPU -> park big models in CPU RAM -
 def free():
     import gc
     gc.collect()
-    if torch.cuda.is_available():
+    if CUDA:
         torch.cuda.empty_cache()
 
 
@@ -54,7 +58,10 @@ BIG = ("transformer", "text_encoder", "condition_encoder")
 def load(model_id, dtype):
     """Kaggle's free T4 has 15 GB. The XL model (~11 GB) fits for denoising, but not together with
     decoding minutes of audio. So we denoise to latents, move the big parts to CPU RAM, then decode."""
-    p = AceStepPipeline.from_pretrained(model_id, torch_dtype=dtype)
+    p = AceStepPipeline.from_pretrained(model_id, torch_dtype=dtype, low_cpu_mem_usage=True)
+    if not CUDA:  # CPU backup: everything stays in RAM, nothing to evict
+        p.vae.to(dtype=torch.float32)
+        return p
     p = p.to("cuda")
     p.vae.to(dtype=torch.float32)  # decode in fp32: avoids NaN on T4 fp16
 
@@ -74,6 +81,8 @@ def load(model_id, dtype):
 
 
 def park(pipe, where):
+    if not CUDA:
+        return
     for n in BIG:
         m = getattr(pipe, n, None)
         if m is not None:
@@ -87,8 +96,9 @@ class LatentNaN(RuntimeError):
 
 def gen(pipe, job, seed, duration):
     park(pipe, "cuda")  # make sure every part is back on the GPU (a failed take may have left some on CPU)
-    g = torch.Generator("cuda").manual_seed(seed)
-    torch.cuda.reset_peak_memory_stats()
+    g = torch.Generator(DEV).manual_seed(seed)
+    if CUDA:
+        torch.cuda.reset_peak_memory_stats()
     with torch.inference_mode():
         lat = pipe(prompt=job["caption"], lyrics=job["lyrics"], audio_duration=float(duration),
                    vocal_language=job.get("language", "en"), num_inference_steps=CFG["steps"],
@@ -158,21 +168,21 @@ for job in JOBS:
                 duration = max(90.0, round(duration * 0.8))  # still too long for this GPU -> shorter song
         if err:
             manifest["errors"].append({"song_id": job["song_id"], "take": c, "error": err,
-                                       "model": active, "peak_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2)})
+                                       "model": active, "peak_gb": (round(torch.cuda.max_memory_allocated() / 2**30, 2) if CUDA else 0)})
             save_manifest()
             continue
         sf.write(os.path.join(OUT, name), arr, pipe.sample_rate, subtype="PCM_24")
         manifest["takes"].append({"song_id": job["song_id"], "take": c, "file": name, "seed": seed,
                                   "model": active, "duration": duration, "gen_seconds": round(time.time() - t, 1),
-                                  "peak_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2)})
+                                  "peak_gb": (round(torch.cuda.max_memory_allocated() / 2**30, 2) if CUDA else 0)})
         save_manifest()
 
 # Free the music model, then transcribe takes (word timestamps) on GPU.
 del pipe
-torch.cuda.empty_cache()
+free()
 try:
     from faster_whisper import WhisperModel
-    wm = WhisperModel(CFG.get("whisper_model", "large-v3-turbo"), device="cuda", compute_type="float16")
+    wm = WhisperModel(CFG.get("whisper_model", "large-v3-turbo"), device=DEV, compute_type="float16" if CUDA else "int8")
     for take in manifest["takes"]:
         job = next(j for j in JOBS if j["song_id"] == take["song_id"])
         a, sr = sf.read(os.path.join(OUT, take["file"]), dtype="float32", always_2d=True)

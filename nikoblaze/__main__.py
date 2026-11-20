@@ -6,6 +6,7 @@
   publish               retry pending YouTube uploads
   generate-song DEPT    plan + submit one extra song (afrobeats|reggae|relaxation)
   retry-production      re-submit rejected/planned songs
+  test-backup           send up to 2 waiting songs to the GitHub CPU backup generator
   retry-upload          reset failed uploads and try again
   pause | resume        stop/start all automation
   status                print a JSON status summary
@@ -59,6 +60,12 @@ def main(argv=None):
                 pipeline.submit([sid])
     elif cmd == "retry-production":
         pipeline.retry_production()
+    elif cmd == "test-backup":  # send waiting songs to the backup generator (checks the failover path)
+        rows = db.get().execute("SELECT id FROM songs WHERE status IN ('retry','planned','abandoned')").fetchall()
+        with db.tx() as c:
+            c.execute("UPDATE songs SET status='retry', attempts=0 WHERE status='abandoned'")
+        if rows:
+            pipeline.submit([r["id"] for r in rows][:2], providers=["gha_cpu"])
     elif cmd == "retry-upload":
         pipeline.retry_uploads()
     elif cmd == "pause":

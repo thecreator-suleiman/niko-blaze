@@ -4,13 +4,14 @@ on:
     inputs:
       action:
         type: choice
-        options: [generate-song, generate-mix, retry-production, retry-upload, pause, resume, publish, status, telegram-test, gpu-log, gpu-fetch]
+        options: [generate-song, generate-mix, retry-production, test-backup, retry-upload, pause, resume, publish, status, telegram-test, gpu-log, gpu-fetch]
       department:
         type: choice
         default: afrobeats
         options: [afrobeats, reggae, relaxation]
 permissions:
   contents: write
+  actions: write
   models: read
 concurrency: {group: nikoblaze-state, cancel-in-progress: false}
 jobs:
