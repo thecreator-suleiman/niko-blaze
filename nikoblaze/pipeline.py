@@ -432,8 +432,12 @@ def announce_live():
     except Exception as e:
         db.log("warn", "live", f"channel feed unavailable: {e}")
         return
-    for r in rows:
-        hit = next((vid for vid, title in feed if _norm(title) == _norm(r["title"])), None)
+    used = {u["youtube_id"] for u in db.get().execute("SELECT youtube_id FROM uploads WHERE youtube_id IS NOT NULL")}
+    for r in sorted(rows, key=lambda r: r["publish_at"] or ""):  # Shorts share a title: oldest gets oldest video
+        hit = next((vid for vid, title in reversed(feed) if _norm(title) == _norm(r["title"]) and vid not in used),
+                   None)
+        if hit:
+            used.add(hit)
         if hit:
             db.update("uploads", "id", r["id"], youtube_id=hit)
             db.kv_set(f"live:{r['ref_id']}", hit)
