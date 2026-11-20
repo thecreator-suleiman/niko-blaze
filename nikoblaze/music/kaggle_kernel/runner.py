@@ -59,8 +59,12 @@ def load(model_id, dtype):
     """Kaggle's free T4 has 15 GB. The XL model (~11 GB) fits for denoising, but not together with
     decoding minutes of audio. So we denoise to latents, move the big parts to CPU RAM, then decode."""
     p = AceStepPipeline.from_pretrained(model_id, torch_dtype=dtype, low_cpu_mem_usage=True)
-    if not CUDA:  # CPU backup: everything stays in RAM, nothing to evict
+    if not CUDA:  # CPU backup (one take per job): RAM is freed before decoding, see gen()
         p.vae.to(dtype=torch.float32)
+        try:
+            p.vae.enable_tiling()
+        except Exception:
+            pass
         return p
     p = p.to("cuda")
     p.vae.to(dtype=torch.float32)  # decode in fp32: avoids NaN on T4 fp16
@@ -109,6 +113,10 @@ def gen(pipe, job, seed, duration):
         if not diag["lat_finite"]:
             raise LatentNaN(f"latents not finite ({pipe.transformer.dtype})")
         park(pipe, "cpu")
+        if not CUDA:  # 16 GB runner: drop the 11 GB of DiT/encoders so the VAE has room to decode
+            for n in BIG:
+                setattr(pipe, n, None)
+            free()
         try:
             audio = pipe.vae.decode(lat.transpose(1, 2).float()).sample.float()
             peak = audio.abs().amax(dim=[1, 2], keepdim=True)
