@@ -44,8 +44,29 @@ def similarity(a: str, b: str) -> float:
     return len(A & B) / max(1, len(A | B))
 
 
+_DANGLING = {"to", "and", "but", "or", "the", "a", "an", "of", "in", "on", "for", "with", "my", "your", "is", "so",
+             "when", "if", "at", "from", "by"}
+
+
+def title_issues(title: str) -> list[str]:
+    """A real song title: 1-6 words, not a cut-off lyric line."""
+    t = (title or "").strip()
+    words = t.split()
+    bad = []
+    if not 1 <= len(words) <= 6:
+        bad.append("title must be 1-6 words")
+    if t[-1:] in ",;:-" or (words and words[-1].lower().strip(",.!?") in _DANGLING):
+        bad.append("title looks like a cut-off lyric line; give a short real song title")
+    if words and words[0].lower() in {"but", "and", "so", "or"}:
+        bad.append("title must not start with a conjunction")
+    return bad
+
+
 def check(lyrics: str, title: str, history: list[tuple[str, str]], max_sim: float = 0.18) -> list[str]:
     """Return a list of problems (empty == acceptable). history = [(title, lyrics), ...]."""
+    issues_t = title_issues(title)
+    if issues_t:
+        return issues_t
     issues = []
     low = lyrics.lower()
     hits = [b for b in BANNED if b in low]
