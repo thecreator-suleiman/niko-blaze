@@ -28,12 +28,33 @@ def _history(department: str, n: int = 60):
 
 
 def _parse(text: str) -> dict:
-    m = re.search(r"\{.*\}", text, re.S)
-    if not m:
+    """Tolerant: handles code fences, <think> blocks, raw newlines inside strings, and plain-text lyrics."""
+    text = (text or "").strip()
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S | re.I)
+    text = re.sub(r"```(?:json)?", "", text, flags=re.I).strip()
+    data = None
+    a, b = text.find("{"), text.rfind("}")
+    if a != -1 and b > a:
+        blob = text[a:b + 1]
+        for attempt in (blob, re.sub(r",\s*([}\]])", r"\1", blob)):
+            try:
+                data = json.loads(attempt, strict=False)
+                break
+            except Exception:
+                continue
+    if data is None and re.search(r"^\s*\[(verse|chorus|intro|hook)", text, re.I | re.M):
+        t = re.search(r"(?im)^\s*\**\s*title\s*\**\s*[:\-]\s*\**\s*\"?([^\"\n*]+)", text)
+        start = re.search(r"(?im)^\s*\[(verse|chorus|intro|hook)", text).start()
+        data = {"title": t.group(1).strip() if t else "", "lyrics": text[start:].strip()}
+        if not data["title"]:
+            hook = re.search(r"(?im)^\s*\[chorus[^\]]*\]\s*\n\s*([^\n\[]+)", text)
+            data["title"] = " ".join((hook.group(1) if hook else "Untitled").split()[:5]).strip(",.!?")
+    if not isinstance(data, dict):
         raise ValueError("model did not return JSON")
-    data = json.loads(m.group(0))
+    if isinstance(data.get("lyrics"), list):
+        data["lyrics"] = "\n".join(map(str, data["lyrics"]))
     for k in ("title", "lyrics"):
-        if not data.get(k):
+        if not data.get(k) or not isinstance(data[k], str):
             raise ValueError(f"missing {k}")
     data["title"] = re.sub(r"[<>\"]", "", data["title"]).strip()[:70]
     return data
@@ -53,15 +74,15 @@ def write(brief: dict) -> dict:
             f"Use exactly these sections in order: {', '.join(brief['structure'])}.\n"
             f"Do not reuse these titles: {recent_titles or 'none yet'}.")
     messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}]
-    last_issues = []
-    for attempt in range(int(cfg("lyrics.max_rewrites", 3)) + 1):
-        text, provider = llm.chat(messages)
+    last_issues, bad_providers = [], set()
+    for attempt in range(int(cfg("lyrics.max_rewrites", 3)) + 3):
+        text, provider = llm.chat(messages, skip=bad_providers)
         try:
             data = _parse(text)
         except Exception as e:
-            last_issues = [f"invalid output: {e}"]
-            messages += [{"role": "assistant", "content": text[:4000]},
-                         {"role": "user", "content": "Return valid JSON only, as specified."}]
+            last_issues = [f"invalid output from {provider}: {e}"]
+            db.log("warn", "lyrics", f"{provider} returned unusable output: {(text or '')[:200]!r}")
+            bad_providers.add(provider)  # next attempt goes to the next free provider
             continue
         issues = quality.check(data["lyrics"], data["title"], history, cfg("lyrics.history_similarity_max", 0.18))
         if not issues:
@@ -69,5 +90,6 @@ def write(brief: dict) -> dict:
             return data
         last_issues = issues
         messages += [{"role": "assistant", "content": text[:6000]},
-                     {"role": "user", "content": "Rewrite the whole song fixing: " + "; ".join(issues)}]
+                     {"role": "user", "content": "Rewrite the whole song fixing: " + "; ".join(issues) +
+                      ". Return ONLY the JSON object."}]
     raise ValueError("lyrics failed quality checks: " + "; ".join(last_issues))

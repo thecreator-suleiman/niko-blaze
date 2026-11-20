@@ -45,11 +45,12 @@ def available() -> list:
     return [p for p in cfg("lyrics.providers", []) if p in PROVIDERS and os.environ.get(PROVIDERS[p]["env"])]
 
 
-def chat(messages: list, temperature: float = 0.95) -> tuple[str, str]:
+def chat(messages: list, temperature: float = 0.95, skip=()) -> tuple[str, str]:
     """Returns (text, provider). Tries free providers in order; raises NoLLMAvailable if all fail."""
     errors = []
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    for name in available():
+    names = [n for n in available() if n not in skip] or available()
+    for name in names:
         p = PROVIDERS[name]
         for attempt in range(2):
             try:
@@ -65,7 +66,11 @@ def chat(messages: list, temperature: float = 0.95) -> tuple[str, str]:
                     break
                 r.raise_for_status()
                 db.add_usage(f"llm:{name}", 1, day)
-                return r.json()["choices"][0]["message"]["content"], name
+                content = (r.json()["choices"][0]["message"].get("content") or "").strip()
+                if not content:
+                    errors.append(f"{name}: empty reply")
+                    break
+                return content, name
             except Exception as e:  # network / 5xx
                 errors.append(f"{name}: {e}")
                 time.sleep(5)

@@ -68,7 +68,7 @@ def test_brief_uniqueness_and_caption():
 def test_lyrics_engine_with_mock_llm(monkeypatch):
     calls = []
 
-    def fake_chat(messages, temperature=0.95):
+    def fake_chat(messages, temperature=0.95, skip=()):
         calls.append(messages)
         if len(calls) == 1:
             return json.dumps({"title": "Neon", "lyrics": "[Verse]\nneon tapestry\n[Chorus]\nsoar"}), "github_models"
