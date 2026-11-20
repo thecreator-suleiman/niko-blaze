@@ -132,6 +132,11 @@ def provider_chain() -> list[str]:
         last = db.get().execute("SELECT status FROM batches WHERE provider='kaggle' AND submitted_at >= ? "
                                 "ORDER BY submitted_at DESC LIMIT 2", (since,)).fetchall()
         sick = len(last) == 2 and all(r["status"] == "error" for r in last)
+        # Kaggle has one notebook slot: pushing again would cancel the running batch
+        busy = db.get().execute("SELECT 1 FROM batches WHERE provider='kaggle' AND status='running'").fetchone()
+        if busy:
+            names.remove("kaggle")
+            return names
         if sick or gpu_budget_left() - cfg("generation.batch_overhead_seconds") <= 0:
             names.remove("kaggle")
             names.append("kaggle")  # still the last resort
