@@ -2,9 +2,12 @@
 from ..config import cfg
 
 
-GENRE_OK = {"afrobeats": {"afrobeats", "amapiano", "afropop", "house music", "dancehall"},
-            "reggae": {"reggae", "dancehall"},
-            "relaxation": {"ambient", "classical piano", "lo-fi"}}
+# AudioSet genre labels accepted per department (amapiano usually reads as House / Music of Africa).
+GENRE_OK = {"afrobeats": {"Afrobeat", "Music of Africa", "House music", "Dance music", "Electronic dance music",
+                          "Pop music", "Hip hop music", "Reggae", "Rhythm and blues", "Electronic music", "Disco"},
+            "reggae": {"Reggae", "Ska", "Dubstep"},
+            "relaxation": {"Ambient music", "New-age music", "Classical music", "Piano", "Lounge music",
+                           "Electric piano"}}
 
 
 def genre_issue(department: str, genres: list | None) -> str | None:

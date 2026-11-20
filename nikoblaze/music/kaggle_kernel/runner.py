@@ -189,37 +189,34 @@ for job in JOBS:
 del pipe
 free()
 
-# Genre check: a music-audio model (CLAP) listens to each take and scores how well it matches genre labels.
-GENRES = ["afrobeats", "amapiano", "afropop", "reggae", "dancehall", "jazz", "smooth jazz", "blues", "soul",
-          "r&b", "hip hop", "pop", "rock", "house music", "gospel", "classical piano", "ambient", "lo-fi",
-          "country", "latin"]
+# Genre check: an AudioSet music classifier (AST) listens to each take; we keep its genre labels only.
+GENRES = {"Pop music", "Hip hop music", "Rock music", "Rhythm and blues", "Soul music", "Reggae", "Ska", "Country",
+          "Funk", "Jazz", "Swing music", "Blues", "Disco", "Classical music", "Electronic music", "House music",
+          "Techno", "Dubstep", "Drum and bass", "Ambient music", "New-age music", "Music of Africa", "Afrobeat",
+          "Music of Latin America", "Salsa music", "Gospel music", "Christian music", "Folk music", "Dance music",
+          "Electronic dance music", "Trance music", "Heavy metal", "Punk rock", "Lounge music", "Music of Asia",
+          "Carnatic music", "Music of Bollywood", "Flamenco", "Opera", "Orchestra", "Piano", "Electric piano"}
 try:
-    from transformers import ClapModel, ClapProcessor
-    cm_id = CFG.get("genre_model", "laion/larger_clap_music")
-    cproc = ClapProcessor.from_pretrained(cm_id)
-    cmod = ClapModel.from_pretrained(cm_id).to(DEV).eval()
-    with torch.no_grad():
-        ti = cproc(text=[f"{g} music" for g in GENRES], return_tensors="pt", padding=True).to(DEV)
-        temb = torch.nn.functional.normalize(cmod.get_text_features(**ti), dim=-1)
+    from transformers import pipeline as hf_pipeline
+    from scipy.signal import resample_poly
+    from math import gcd
+    clf = hf_pipeline("audio-classification", model=CFG.get("genre_model", "MIT/ast-finetuned-audioset-10-10-0.4593"),
+                      device=0 if CUDA else -1)
     for take in manifest["takes"]:
         try:
             a, sr = sf.read(os.path.join(OUT, take["file"]), dtype="float32", always_2d=True)
             a = a.mean(axis=1)
-            if sr != 48000:
-                from scipy.signal import resample_poly
-                from math import gcd
-                g = gcd(48000, sr)
-                a = resample_poly(a, 48000 // g, sr // g).astype("float32")
-            n = len(a)
-            clips = [a[int(n * f):int(n * f) + 48000 * 10] for f in (0.2, 0.4, 0.6, 0.8)]
-            with torch.no_grad():
-                ai = cproc(audios=clips, sampling_rate=48000, return_tensors="pt").to(DEV)
-                aemb = torch.nn.functional.normalize(cmod.get_audio_features(**ai), dim=-1).mean(0, keepdim=True)
-                sims = (aemb @ temb.T)[0].softmax(-1).tolist()
-            take["genres"] = sorted(([g, round(s, 3)] for g, s in zip(GENRES, sims)), key=lambda x: -x[1])[:5]
+            g = gcd(16000, sr)
+            a = resample_poly(a, 16000 // g, sr // g).astype("float32")
+            n, tot = len(a), {}
+            for f in (0.2, 0.4, 0.6, 0.8):  # four 10 s windows across the song
+                for r in clf({"raw": a[int(n * f):int(n * f) + 160000], "sampling_rate": 16000}, top_k=None):
+                    if r["label"] in GENRES:
+                        tot[r["label"]] = tot.get(r["label"], 0) + r["score"] / 4
+            take["genres"] = [[k, round(v, 3)] for k, v in sorted(tot.items(), key=lambda x: -x[1])[:5]]
         except Exception as e:
             manifest["errors"].append({"stage": "genre", "song_id": take["song_id"], "error": str(e)[:300]})
-    del cmod
+    del clf
     free()
     save_manifest()
 except Exception as e:
