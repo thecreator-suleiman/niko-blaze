@@ -194,6 +194,11 @@ class GhaCpuProvider(Provider):
             return "running"
         if r["conclusion"] == "success":
             return "complete"
+        repo = os.environ.get("GITHUB_REPOSITORY", "")
+        arts = self._gh("api", f"repos/{repo}/actions/runs/{r['databaseId']}/artifacts", "--jq",
+                        ".artifacts[].name", check=False)
+        if batch_id in arts.split():  # some takes failed/timed out, but the merged output exists
+            return "complete"
         self.last_error = f"GitHub CPU run {r['databaseId']} ended: {r['conclusion']}"
         return "error"
 
