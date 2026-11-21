@@ -53,5 +53,5 @@ def mix(dept: str, volume: int, chapters: list[tuple[float, str]]) -> dict:
 def short(song: dict) -> dict:
     title = clean(f"{song['title']} - Niko Blaze #Shorts")[:100]
     desc = (f"From the new Niko Blaze {song['subgenre']} song \"{song['title']}\". Full song on the channel.\n\n"
-            f"{DISCLOSURE}\n\n#Shorts #NikoBlaze #{song['subgenre'].replace(' ', '')}")
+            f"#Shorts #NikoBlaze #{song['subgenre'].replace(' ', '')}")
     return {"title": title, "description": clean(desc)[:4900], "tags": _tags("afrobeats", ["shorts"])}
