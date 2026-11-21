@@ -31,7 +31,7 @@ def single(song: dict) -> dict:
     title = clean(f"Niko Blaze - {song['title']} ({song['subgenre'].title()})")[:100]
     lyric_text = "\n".join(sung_lines(song["lyrics"]))
     desc = (f"{song['title']} — an original {song['subgenre']} story by Niko Blaze.\n\n"
-            f"Story: {song.get('concept') or ''}\n\nLYRICS\n{lyric_text}\n\n{DISCLOSURE}\n\n"
+            f"Story: {song.get('concept') or ''}\n\nLYRICS\n{lyric_text}\n\n"
             f"#NikoBlaze #{song['subgenre'].replace(' ', '')} #AfricanMusic")
     return {"title": title, "description": clean(desc)[:4900], "tags": _tags("afrobeats", [song["subgenre"]])}
 
@@ -46,7 +46,7 @@ def mix(dept: str, volume: int, chapters: list[tuple[float, str]]) -> dict:
     title = clean(f"1 Hour {label} Mix (Pre-recorded) - Niko Blaze | Vol. {volume}")[:100]
     lines = "\n".join(f"{_ts(t)} {clean(name)}" for t, name in chapters)
     desc = (f"A pre-recorded one-hour {label.lower()} mix of original Niko Blaze music. "
-            f"This is not a live broadcast.\n\nTRACKLIST\n{lines}\n\n{DISCLOSURE}\n\n#NikoBlaze")
+            f"This is not a live broadcast.\n\nTRACKLIST\n{lines}\n\n#NikoBlaze")
     return {"title": title, "description": clean(desc)[:4900], "tags": _tags(dept, ["1 hour mix"])}
 
 
