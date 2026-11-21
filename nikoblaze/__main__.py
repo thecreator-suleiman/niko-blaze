@@ -62,6 +62,8 @@ def main(argv=None):
         pipeline.retry_production()
     elif cmd == "withdraw":  # withdraw <song_id> [reason...]: cancel scheduled posts, reject the song
         pipeline.cancel_song(args[0], " ".join(args[1:]) or "withdrawn manually")
+    elif cmd == "test-mix":
+        pipeline.test_mix(args[0] if args else "relaxation")
     elif cmd == "reprocess":
         pipeline.reprocess(args[0] if args else None)
     elif cmd == "live-check":

@@ -634,6 +634,37 @@ def daily_mixes(depts=None):
     publish_pending()
 
 
+def test_mix(dept: str = "relaxation"):
+    """Dry run of the weekly mix: build + render from the current library with a low minimum, then undo all
+    database changes. Nothing is uploaded. Reports the result to Telegram."""
+    import sqlite3
+    snap = sqlite3.connect(":memory:")
+    db.get().backup(snap)  # restore point
+    os.environ["NB_SCHEDULE__MIX_MIN_MINUTES"] = "5"
+    try:
+        mx = mixes.build(dept)
+        if not mx:
+            notify.problem(f"mix test ({dept}): library too small even for a short test")
+            return
+        out = mx["dir"] / f"{mx['id']}.mp4"
+        render.render_mix(dept, f"1 Hour {dept.title()} Mix · Vol. {mx['volume']}", mx["audio"], mx["duration"],
+                          out, badge="1 HOUR · PRE-RECORDED")
+        thumbnails.make(dept, f"1 Hour {dept.title()} Mix", mx["dir"] / f"{mx['id']}_thumb.jpg", badge="1 HOUR MIX")
+        loop = out.parent / f"{out.stem}_layers" / "loop.mp4"
+        ok = loop.exists() and Path(mx["audio"]).exists()
+        notify.text(f"🧪 Mix test ({dept}): {'OK' if ok else 'FAILED'} — {len(mx['chapters'])} "
+                    f"tracks, {mx['duration'] / 60:.1f} min rendered (test only, nothing uploaded).")
+        db.log("info", "mix", f"test mix {dept} ok={ok} {mx['duration'] / 60:.1f} min")
+        shutil.rmtree(mx["dir"], ignore_errors=True)
+    except Exception as e:
+        notify.problem(f"mix test ({dept}) FAILED: {type(e).__name__}: {str(e)[:300]}")
+        raise
+    finally:
+        os.environ.pop("NB_SCHEDULE__MIX_MIN_MINUTES", None)
+        snap.backup(db.get())  # undo: the test leaves no trace in the library or mix history
+        db.log("info", "mix", f"test mix {dept} finished; database restored")
+
+
 # ------------------------------------------------------------------ maintenance
 def retry_production():
     """Manual retry (control action): also revives songs abandoned after repeated GPU failures."""

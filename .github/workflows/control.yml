@@ -4,7 +4,7 @@ on:
     inputs:
       action:
         type: choice
-        options: [generate-song, generate-mix, retry-production, reprocess, withdraw, live-check, test-backup, retry-upload, pause, resume, publish, status, telegram-test, gpu-log, gpu-fetch]
+        options: [generate-song, generate-mix, test-mix, retry-production, reprocess, withdraw, live-check, test-backup, retry-upload, pause, resume, publish, status, telegram-test, gpu-log, gpu-fetch]
       department:
         type: choice
         default: afrobeats
@@ -52,6 +52,7 @@ jobs:
           case "${{ inputs.action }}" in
             generate-song) python -m nikoblaze generate-song "${{ inputs.department }}" ;;
             generate-mix)  python -m nikoblaze mixes "${{ inputs.department }}" ;;
+            test-mix)      python -m nikoblaze test-mix "${{ inputs.department }}" ;;
             withdraw)      python -m nikoblaze withdraw ${{ inputs.target }} ;;
             gpu-fetch)     mkdir -p gpu_out && kaggle kernels output "$KAGGLE_USERNAME/niko-blaze-gen" -p gpu_out || true ;;
             *)             python -m nikoblaze "${{ inputs.action }}" ;;
