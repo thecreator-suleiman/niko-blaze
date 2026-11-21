@@ -29,6 +29,18 @@ def _history(department: str, n: int = 60):
     return [(r["title"], r["lyrics"]) for r in rows]
 
 
+def _extend(lyrics: str) -> str:
+    """Add a final chorus (and outro repeat) when a song is a little short."""
+    m = re.search(r"(?ims)^\s*\[chorus[^\]]*\]\s*\n(.*?)(?=^\s*\[|\Z)", lyrics)
+    if not m:
+        return lyrics
+    chorus = m.group(1).strip()
+    out = lyrics.rstrip() + "\n\n[Chorus]\n" + chorus
+    if len([l for l in out.splitlines() if l.strip() and not l.strip().startswith("[")]) < 20:
+        out += "\n\n[Outro]\n" + chorus
+    return out
+
+
 def retitle(lyrics: str) -> str:
     """Ask a free LLM for a proper short song title (used when the given one is missing or a lyric fragment)."""
     msgs = [{"role": "user", "content": "Give one original, memorable song title (1-5 words, no commas, not a "
@@ -89,9 +101,10 @@ def write(brief: dict) -> dict:
                 "lyrics": "[Instrumental]", "provider": "none"}
     history = _history(brief["department"])
     recent_titles = ", ".join(t for t, _ in history[:40])
-    lines_target = int(brief["duration"] / 4.2)
+    lines_target = max(24, int(brief["duration"] / 4.2))
     user = (f"Brief:\n{json.dumps({k: brief[k] for k in ('subgenre', 'theme', 'setting', 'perspective', 'arc', 'bpm', 'structure')}, indent=1)}\n"
-            f"Target about {lines_target} sung lines in total for a {brief['duration']}s song. "
+            f"Write at least {lines_target} sung lines in total (section tags do not count) for a "
+            f"{brief['duration']}s song. Each verse needs 8 lines, each chorus 4-6 lines. "
             f"Use exactly these sections in order: {', '.join(brief['structure'])}.\n"
             f"Do not reuse these titles: {recent_titles or 'none yet'}.")
     messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}]
@@ -106,10 +119,15 @@ def write(brief: dict) -> dict:
             bad_providers.add(provider)  # next attempt goes to the next free provider
             continue
         issues = quality.check(data["lyrics"], data["title"], history, cfg("lyrics.history_similarity_max", 0.18))
+        if issues == ["too few lines for a full song"]:  # repeat the chorus at the end, as real songs do
+            data["lyrics"] = _extend(data["lyrics"])
+            issues = quality.check(data["lyrics"], data["title"], history, cfg("lyrics.history_similarity_max", 0.18))
         if not issues:
             data["provider"] = provider
             return data
         last_issues = issues
+        if attempt >= 1:
+            bad_providers.add(provider)  # this model keeps missing; let the next free model try
         messages += [{"role": "assistant", "content": text[:6000]},
                      {"role": "user", "content": "Rewrite the whole song fixing: " + "; ".join(issues) +
                       ". Return ONLY the JSON object."}]
