@@ -245,7 +245,12 @@ def process_song(sid: str, takes: list, src_dir: Path):
     dept, instrumental = song["department"], song["department"] == "relaxation"
     results = []
     for t in takes:
-        path = src_dir / t["file"]
+        raw = src_dir / t["file"]
+        try:  # corrective EQ first, then judge the corrected audio (what listeners will actually hear)
+            path = raw.with_name(raw.stem + "_eq.wav")
+            fix = mastering.tonal_fix(raw, path, dept, analysis.analyze(raw))
+        except Exception as e:
+            path, fix = raw, {"error": str(e)[:200]}
         m = analysis.analyze(path)
         words = t.get("words")
         if words is None:
@@ -255,19 +260,21 @@ def process_song(sid: str, takes: list, src_dir: Path):
                 words = None
         al = None if instrumental else align.align(song["lyrics"], words or [], m["duration"])
         ratio = al["match_ratio"] if (al and words is not None) else None
-        qc = quality.score_take(m, dept, instrumental, ratio, len(words or []), t.get("genres"))
+        n_words = quality.sung_words(words) if instrumental else len(words or [])
+        qc = quality.score_take(m, dept, instrumental, ratio, n_words, t.get("genres"))
         results.append((qc, m, al, path))
         db.log("info", "qc", f"{sid} take {t['take']}: score {qc['score']} passed={qc['passed']} "
-                             f"{'; '.join(qc['hard'] + qc['warnings'])} genre={(t.get('genres') or [['?']])[0][0]}")
+                             f"{'; '.join(qc['hard'] + qc['warnings'])} eq={fix} genre={(t.get('genres') or [['?']])[0][0]}")
     passing = sorted([r for r in results if r[0]["passed"]], key=lambda r: -r[0]["score"])
     if not passing:
         reasons = "; ".join(sorted({h for r in results for h in r[0]["hard"] + r[0]["warnings"]})) or "no takes produced"
         _requeue([sid], f"all takes rejected: {reasons}")
-        if results:
-            notify.problem(f"song '{song['title']}' rejected by quality control ({reasons[:200]}) — regenerating")
-        else:
-            notify.problem(f"song '{song['title']}': the GPU produced no audio (technical error, not quality) "
-                           f"— retrying automatically")
+        # Routine: the system regenerates on its own, so no alert per song. Only a song that is given up on
+        # after the last attempt is reported (by _requeue / the daily summary).
+        st = db.get().execute("SELECT status FROM songs WHERE id=?", (sid,)).fetchone()
+        if st and st["status"] == "abandoned":
+            notify.problem(f"song '{song['title']}' failed quality control on every attempt and was dropped "
+                           f"({reasons[:160]}). A new song will be planned instead — no action needed.")
         return
     qc, m, al, path = passing[0]
     day = datetime.now(TZ).strftime("%Y%m%d")
@@ -449,6 +456,24 @@ def announce_live():
             db.kv_set(f"live_warned:{r['ref_id']}", True)
             notify.problem(f"'{r['title']}' was due at {notify.local_time(r['publish_at'])} (Kigali) but is not on "
                            f"the channel yet. Check app.upload-post.com history.")
+
+
+def reprocess(batch_id: str | None = None):
+    """Re-judge the takes of a finished batch with the current QC (no new GPU time)."""
+    b = db.get().execute("SELECT * FROM batches WHERE (? IS NULL OR id=?) AND status='complete' "
+                         "ORDER BY submitted_at DESC LIMIT 1", (batch_id, batch_id)).fetchone()
+    if not b:
+        return
+    prov = get_provider(b["provider"])
+    man = prov.fetch(b["id"], work_dir("gpu", b["id"]))
+    for sid in json.loads(b["info"]):
+        st = db.get().execute("SELECT status FROM songs WHERE id=?", (sid,)).fetchone()
+        if st and st["status"] in ("retry", "abandoned", "planned"):
+            try:
+                process_song(sid, [t for t in man["takes"] if t["song_id"] == sid], Path(man["dir"]))
+            except Exception as e:
+                db.log("error", "collect", f"{sid}: reprocess failed: {e}")
+    publish_pending()
 
 
 def cancel_song(sid: str, reason: str):

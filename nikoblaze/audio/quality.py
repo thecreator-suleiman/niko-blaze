@@ -1,4 +1,5 @@
 """Quality control: score each generated take; hard failures are never published."""
+import re
 from ..config import cfg
 
 
@@ -8,6 +9,27 @@ GENRE_OK = {"afrobeats": {"Afrobeat", "Music of Africa", "House music", "Dance m
             "reggae": {"Reggae", "Ska", "Dubstep"},
             "relaxation": {"Ambient music", "New-age music", "Classical music", "Piano", "Lounge music",
                            "Electric piano"}}
+
+
+_HALLU = re.compile(r"thank(s| you)|for watching|for listening|subscribe|like and|see you|bye|music|"
+                    r"amara|subtitles|copyright|\d+", re.I)
+
+
+def sung_words(words: list | None) -> int:
+    """Count words that are really sung. Whisper hallucinates on quiet music ("Thank you. Thank you...",
+    numbered lists); those are low-confidence, repetitive or stock phrases and are not vocals."""
+    if not words:
+        return 0
+    keep = []
+    for w in words:
+        t = (w.get("w") if isinstance(w, dict) else str(w)) or ""
+        p = w.get("p", 1.0) if isinstance(w, dict) else 1.0
+        t = re.sub(r"[^a-z']", "", t.lower())
+        if t and p >= 0.5 and not _HALLU.search(t):
+            keep.append(t)
+    if len(set(keep)) < 6:  # a loop of the same few words is a hallucination, not a vocal line
+        return 0
+    return len(keep)
 
 
 def genre_issue(department: str, genres: list | None) -> str | None:

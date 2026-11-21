@@ -91,7 +91,7 @@ def caption_for(b: dict) -> str:
         b["palette"] = (b.get("palette") or "").replace(k, v)
     if b["instrumental"]:
         parts = [b["subgenre"] + " music", b["palette"], f"evokes {b['theme']}", "no vocals",
-                 "calm, spacious, crisp high fidelity studio recording, clear detailed highs, airy, natural dynamics"]
+                 "calm, spacious, crisp high fidelity studio recording, bright upper-register melody, sparkling clear treble, airy, not muddy, natural dynamics"]
     else:
         anchor = GENRE_ANCHOR.get(b["subgenre"], b["subgenre"])
         parts = [anchor, b["palette"], b["vocal_style"], b["harmony"], f"mood: {b['arc']}",
