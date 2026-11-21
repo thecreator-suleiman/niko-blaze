@@ -4,6 +4,7 @@ import json
 import random
 import shutil
 import os
+import time
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -42,16 +43,24 @@ def gpu_budget_left() -> float:
 
 # ------------------------------------------------------------------ plan
 def _new_song(dept: str, rng: random.Random, is_single: bool, subgenre=None) -> str | None:
-    b = briefs.make_brief(dept, rng, subgenre)
-    sid = f"{dept[:3]}-{datetime.now(TZ):%Y%m%d}-{rng.randrange(16 ** 6):06x}"
-    try:
-        lyr = engine.write(b)
-    except llm.NoLLMAvailable as e:
-        db.log("warn", "lyrics", f"{sid}: no free lyrics capacity, vocal song skipped ({e})")
+    lyr = None
+    for attempt in range(3):  # a fresh brief each time; one bad draft or a busy provider must not cost a song
+        b = briefs.make_brief(dept, rng, subgenre)
+        sid = f"{dept[:3]}-{datetime.now(TZ):%Y%m%d}-{rng.randrange(16 ** 6):06x}"
+        try:
+            lyr = engine.write(b)
+            break
+        except (llm.NoLLMAvailable, ValueError) as e:
+            db.log("warn", "lyrics", f"{sid}: attempt {attempt + 1}/3 failed: {str(e)[:400]}")
+            time.sleep(20)
+    if lyr is None:
+        if is_single:  # the weekly single must not be lost: collect() retries every run until it works
+            db.kv_set("pending_single", {"dept": dept, "subgenre": subgenre})
+            notify.problem("lyrics for this week's single could not be written yet (free AI providers busy). "
+                           "The system retries automatically every 2 hours — no action needed.")
         return None
-    except ValueError as e:
-        db.log("warn", "lyrics", f"{sid}: {e}")
-        return None
+    if is_single:
+        db.kv_set("pending_single", None)
     b.update({"concept": lyr.get("concept"), "hook": lyr.get("hook"), "lyrics_provider": lyr["provider"]})
     with db.tx() as c:
         c.execute("INSERT INTO songs(id,department,subgenre,title,brief_json,lyrics,caption,bpm,keyscale,duration,seed,"
@@ -222,6 +231,11 @@ def collect():
                     _requeue([sid], f"processing failed: {e}")
     repair_singles()
     announce_live()
+    ps = db.kv_get("pending_single")
+    if ps and not db.is_paused():
+        sid = _new_song(ps["dept"], random.Random(), True, ps.get("subgenre"))
+        if sid:
+            submit([sid])
     # Self-healing: if a batch just failed, re-submit straight away (the provider chain skips a sick Kaggle)
     # instead of waiting for tomorrow's plan.
     if retry_now and not db.is_paused() and not db.get().execute(
