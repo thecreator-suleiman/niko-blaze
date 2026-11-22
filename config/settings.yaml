@@ -68,7 +68,7 @@ publishing:
   # youtube_api is unlimited but stays private until Google's free audit is approved (then set audited: true).
   # youtube_api_private removed: unaudited API uploads are locked private — better to wait in the queue
   # (they go out next month, or immediately once the free Google audit is approved and audited: true).
-  order: [youtube_api_audited, upload_post]
+  order: [youtube_api_audited, zernio, upload_post]   # zernio = free, unlimited (needs ZERNIO_API_KEY)
   long_uploads_per_week: 2   # single + mix; Shorts only use free Upload-Post slots beyond this reserve
   upload_post_monthly_limit: 10
   max_per_week: {single: 1, mix: 1, short: 3}

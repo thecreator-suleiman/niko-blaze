@@ -53,7 +53,7 @@ def posted(kind: str, ref: str, meta: dict, video: Path, thumb: Path | None, pri
         return
     vid = ref.split(":")[-1]
     tags = " ".join("#" + re.sub(r"\W", "", t) for t in meta["tags"])
-    if when or ref.startswith("uploadpost"):
+    if when or ":" in ref:  # handed to a scheduler (uploadpost:, zernio:) — not visible yet
         # Handed over but not visible yet. A separate "✅ LIVE" message with the real link follows.
         head = (f"🕒 SCHEDULED — {kind.upper()}\n{meta['title']}\n"
                 + (f"Goes live: {local_time(when)} (Kigali time)\n" if when else "Publishing now…\n")

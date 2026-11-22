@@ -1,6 +1,7 @@
 """Publisher chain: own YouTube API (once audited) -> Upload-Post free API (public immediately).
 If every publisher is unavailable the video simply waits in the queue — it is never lost or faked."""
 import os
+from pathlib import Path
 from datetime import datetime, timezone
 
 import requests
@@ -22,6 +23,56 @@ def upload_post_left() -> int:
     if not (os.environ.get("UPLOADPOST_API_KEY") and os.environ.get("UPLOADPOST_USER")):
         return 0
     return int(cfg("publishing.upload_post_monthly_limit", 10) - db.usage("upload_post", _month()))
+
+
+ZERNIO = "https://zernio.com/api/v1"
+
+
+def _zernio_put(path, content_type) -> str:
+    h = {"Authorization": f"Bearer {os.environ['ZERNIO_API_KEY']}"}
+    r = requests.post(f"{ZERNIO}/media/presign", headers=h, timeout=60,
+                      json={"filename": Path(path).name, "contentType": content_type, "size": Path(path).stat().st_size})
+    r.raise_for_status()
+    js = r.json()
+    with open(path, "rb") as f:
+        requests.put(js["uploadUrl"], data=f, headers={"Content-Type": content_type}, timeout=3600).raise_for_status()
+    return js["publicUrl"]
+
+
+def _zernio_account() -> str:
+    acc = os.environ.get("ZERNIO_ACCOUNT_ID")
+    if acc:
+        return acc
+    h = {"Authorization": f"Bearer {os.environ['ZERNIO_API_KEY']}"}
+    js = requests.get(f"{ZERNIO}/accounts", headers=h, timeout=60).json()
+    for a in js.get("accounts", js if isinstance(js, list) else []):
+        if a.get("platform") == "youtube":
+            return a.get("_id") or a.get("id")
+    raise RuntimeError("no YouTube channel connected in Zernio")
+
+
+def zernio(video, meta, publish_at=None, thumb=None) -> str:
+    """Zernio free plan: unlimited posts for up to 2 connected accounts, uses Zernio's audited Google app."""
+    item = {"type": "video", "url": _zernio_put(video, "video/mp4")}
+    if thumb:
+        item["thumbnail"] = _zernio_put(thumb, "image/jpeg")
+    psd = {"title": meta["title"][:100], "visibility": "public", "categoryId": "10", "madeForKids": False,
+           "containsSyntheticMedia": True}
+    body = {"content": meta["description"][:5000], "mediaItems": [item], "tags": meta["tags"][:15],
+            "platforms": [{"platform": "youtube", "accountId": _zernio_account(), "platformSpecificData": psd}]}
+    if publish_at:
+        body.update({"scheduledFor": publish_at.replace("Z", ""), "timezone": "UTC"})
+    else:
+        body["publishNow"] = True
+    h = {"Authorization": f"Bearer {os.environ['ZERNIO_API_KEY']}", "Content-Type": "application/json"}
+    r = requests.post(f"{ZERNIO}/posts", headers=h, json=body, timeout=600)
+    if r.status_code == 400 and "containsSyntheticMedia" in r.text:
+        psd.pop("containsSyntheticMedia")
+        r = requests.post(f"{ZERNIO}/posts", headers=h, json=body, timeout=600)
+    if r.status_code >= 300:
+        raise RuntimeError(f"Zernio {r.status_code}: {r.text[:300]}")
+    post = r.json().get("post", {})
+    return "zernio:" + str(post.get("_id") or post.get("id") or "")
 
 
 def upload_post(video, meta, publish_at=None, thumb=None) -> str:
@@ -70,6 +121,8 @@ def publish(video, meta, publish_at=None, thumb=None, kind: str = "single") -> t
             if name == "youtube_api_audited" and have_api and cfg("youtube.audited", False):
                 privacy = "scheduled" if publish_at else "public"
                 return yt.upload(video, meta, privacy, publish_at, thumb), privacy
+            if name == "zernio" and os.environ.get("ZERNIO_API_KEY"):
+                return zernio(video, meta, publish_at, thumb), "public"
             if name == "upload_post" and os.environ.get("UPLOADPOST_API_KEY") and upload_post_left() > _reserve(kind):
                 return upload_post(video, meta, publish_at, thumb), "public"
             if name == "youtube_api_private" and have_api:
