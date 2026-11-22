@@ -1,0 +1,22 @@
+name: Live check (Telegram ✅ LIVE + link)
+# Checks every 15 min whether scheduled videos are visible on the channel and sends the YouTube link to Telegram.
+on:
+  schedule: [{cron: "7,22,37,52 * * * *"}]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: {group: nikoblaze-state, cancel-in-progress: false}
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: python -m nikoblaze live-check
+      - run: python -m nikoblaze state-push
