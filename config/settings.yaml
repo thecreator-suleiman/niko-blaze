@@ -82,7 +82,7 @@ youtube:
   schedule_local_times: {single: "18:00", mix: "20:00", short: "17:00"}
   max_uploads_per_day: 4
   category_id: "10"         # Music
-  contains_synthetic_media: true   # YouTube altered/synthetic content disclosure — never set false
+  contains_synthetic_media: false  # owner's choice (22 Nov 2026). YouTube's rules ask for this on AI music; set true to re-enable
   set_thumbnails: true      # needs a phone-verified channel
 
 

@@ -49,7 +49,7 @@ def upload(path, meta: dict, privacy: str, publish_at: str | None = None, thumb=
     yt = service()
     status = {"privacyStatus": "private" if privacy == "scheduled" else privacy,
               "selfDeclaredMadeForKids": False,
-              "containsSyntheticMedia": bool(cfg("youtube.contains_synthetic_media", True))}
+              "containsSyntheticMedia": bool(cfg("youtube.contains_synthetic_media", False))}
     if privacy == "scheduled" and publish_at:
         status["publishAt"] = publish_at
     body = {"snippet": {"title": meta["title"], "description": meta["description"], "tags": meta["tags"],

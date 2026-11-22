@@ -28,6 +28,10 @@ def upload_post_left() -> int:
 ZERNIO = "https://zernio.com/api/v1"
 
 
+def _ai_label() -> bool:
+    return bool(cfg("youtube.contains_synthetic_media", False))
+
+
 def _zernio_put(path, content_type) -> str:
     h = {"Authorization": f"Bearer {os.environ['ZERNIO_API_KEY']}"}
     r = requests.post(f"{ZERNIO}/media/presign", headers=h, timeout=60,
@@ -57,7 +61,7 @@ def zernio(video, meta, publish_at=None, thumb=None) -> str:
     if thumb:
         item["thumbnail"] = _zernio_put(thumb, "image/jpeg")
     psd = {"title": meta["title"][:100], "visibility": "public", "categoryId": "10", "madeForKids": False,
-           "containsSyntheticMedia": True}
+           "containsSyntheticMedia": _ai_label()}
     body = {"content": meta["description"][:5000], "mediaItems": [item], "tags": meta["tags"][:15],
             "platforms": [{"platform": "youtube", "accountId": _zernio_account(), "platformSpecificData": psd}]}
     if publish_at:
@@ -79,7 +83,7 @@ def upload_post(video, meta, publish_at=None, thumb=None) -> str:
     data = [("user", os.environ["UPLOADPOST_USER"]), ("platform[]", "youtube"), ("title", meta["title"]),
             ("description", meta["description"]), ("privacyStatus", "public"),
             ("categoryId", cfg("youtube.category_id", "10")), ("selfDeclaredMadeForKids", "false"),
-            ("containsSyntheticMedia", "true"), ("async_upload", "true")]
+            ("containsSyntheticMedia", "true" if _ai_label() else "false"), ("async_upload", "true")]
     data += [("tags[]", t) for t in meta["tags"]]
     if publish_at:
         data += [("scheduled_date", publish_at), ("timezone", "UTC")]
