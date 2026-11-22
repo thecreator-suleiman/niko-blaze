@@ -84,6 +84,7 @@ def _dummy(tmp, name):
 
 
 def test_short_and_publish_chain(tmp, monkeypatch):
+    monkeypatch.setenv("NB_SCHEDULE__SHORTS_PER_SINGLE", "3")
     from nikoblaze.youtube import publish
     lines = [{"text": "hook line here", "start": 60.0, "end": 62.0, "words": [("hook", 60, 60.5)]}]
     song = {"master_duration": 200.0, "brief_json": '{"hook": "hook line here"}'}

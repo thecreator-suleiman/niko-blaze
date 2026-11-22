@@ -509,6 +509,10 @@ def reschedule(sid: str, at_kigali: str):
                                      headers=h, timeout=60).ok
     if n:
         db.add_usage("upload_post", -n, publisher._month())
+    try:  # the local copy is deleted once handed over; rebuild it from the stored master audio
+        render_single(sid)
+    except Exception as e:
+        db.log("error", "publish", f"{sid}: re-render failed: {e}")
     with db.tx() as c:
         c.execute("UPDATE uploads SET status='cancelled' WHERE ref_id LIKE ?", (f"{sid}#%",))
         c.execute("UPDATE uploads SET status='pending', attempts=0, publish_at=?, youtube_id=NULL WHERE ref_id=?",
