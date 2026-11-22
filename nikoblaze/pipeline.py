@@ -490,6 +490,33 @@ def reprocess(batch_id: str | None = None):
     publish_pending()
 
 
+def reschedule(sid: str, at_kigali: str):
+    """Move a song's full video to a new time (Kigali, 'YYYY-MM-DD HH:MM' or 'HH:MM' = today) and drop its Shorts."""
+    import requests
+    if len(at_kigali) <= 5:
+        at_kigali = f"{datetime.now(TZ):%Y-%m-%d} {at_kigali}"
+    at = (datetime.strptime(at_kigali, "%Y-%m-%d %H:%M") - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    key = os.environ.get("UPLOADPOST_API_KEY")
+    ups = db.get().execute("SELECT * FROM uploads WHERE ref_id=? OR ref_id LIKE ?", (sid, f"{sid}#%")).fetchall()
+    titles = {_norm(u["title"]) for u in ups if u["title"]}
+    n = 0
+    if key and titles:
+        h = {"Authorization": f"Apikey {key}"}
+        r = requests.get("https://api.upload-post.com/api/uploadposts/schedule", headers=h, timeout=60)
+        for j in r.json().get("scheduled_posts", []):
+            if _norm(j.get("title")) in titles:
+                n += requests.delete(f"https://api.upload-post.com/api/uploadposts/schedule/{j['job_id']}",
+                                     headers=h, timeout=60).ok
+    if n:
+        db.add_usage("upload_post", -n, publisher._month())
+    with db.tx() as c:
+        c.execute("UPDATE uploads SET status='cancelled' WHERE ref_id LIKE ?", (f"{sid}#%",))
+        c.execute("UPDATE uploads SET status='pending', attempts=0, publish_at=?, youtube_id=NULL WHERE ref_id=?",
+                  (at, sid))
+    db.log("info", "publish", f"{sid}: {n} scheduled posts cancelled; full video re-queued for {at}")
+    publish_pending()
+
+
 def cancel_song(sid: str, reason: str):
     """Pull a song before it goes live: cancel its scheduled Upload-Post jobs (credits come back) and reject it."""
     import requests
@@ -583,7 +610,7 @@ def publish_pending():
         if dup:
             db.update("uploads", "id", u["id"], status="uploaded", youtube_id=dup["youtube_id"])
             continue
-        when = _publish_slot(u["kind"], done)
+        when = u["publish_at"] if (u["publish_at"] or "") > db.now() else _publish_slot(u["kind"], done)
         wd = work_dir("upload", u["ref_id"].replace("#", "_"))
         try:
             if u["video_asset"].startswith("{"):

@@ -25,7 +25,7 @@ schedule:                     # quality over quantity (YouTube "inauthentic cont
   single_days: [Mon]          # a new single is generated on these days (published Friday)
   mix_rotation: [reggae, afrobeats, relaxation]   # one 1-hour mix per week, genre rotates weekly
   mix_tracks_per_day: 3       # new tracks/day for this week's mix -> ~100% new music every mix
-  shorts_per_single: 3        # chorus Shorts cut from each single, spread over the week
+  shorts_per_single: 0        # chorus Shorts cut from each single, spread over the week
   mix_target_minutes: 60
   mix_min_minutes: 50
   track_reuse_cooldown_days: 60
