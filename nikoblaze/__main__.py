@@ -64,6 +64,29 @@ def main(argv=None):
         pipeline.cancel_song(args[0], " ".join(args[1:]) or "withdrawn manually")
     elif cmd == "reschedule":  # reschedule <song_id> <HH:MM | YYYY-MM-DD HH:MM> (Kigali time)
         pipeline.reschedule(args[0], " ".join(args[1:]))
+    elif cmd == "api-test":  # does our own (audited) API project publish without the private lock?
+        import time, subprocess, tempfile
+        from .youtube import client as ytc
+        from . import notify
+        d = tempfile.mkdtemp()
+        v = f"{d}/t.mp4"
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=black:s=1280x720:d=8",
+                        "-f", "lavfi", "-i", "sine=frequency=440:duration=8", "-shortest", "-c:v", "libx264",
+                        "-pix_fmt", "yuv420p", "-c:a", "aac", v], check=True)
+        meta = {"title": "API test (will be deleted)", "description": "test", "tags": [], "category": "10"}
+        vid = ytc.upload(v, meta, "unlisted").split(":")[-1]
+        time.sleep(90)
+        yt = ytc.service()
+        st = yt.videos().list(part="status", id=vid).execute()["items"][0]["status"]
+        ok = st.get("privacyStatus") == "unlisted"
+        print("API TEST", vid, st)
+        try:
+            yt.videos().delete(id=vid).execute()
+            deleted = "deleted"
+        except Exception as e:
+            deleted = f"NOT deleted ({str(e)[:100]}) - delete it in YouTube Studio"
+        notify.text(f"🧪 YouTube API test: {'PASSED — own API can publish publicly' if ok else 'still LOCKED private'} "
+                    f"(status {st.get('privacyStatus')}); test video {deleted}.")
     elif cmd == "test-mix":
         pipeline.test_mix(args[0] if args else "relaxation")
     elif cmd == "reprocess":
