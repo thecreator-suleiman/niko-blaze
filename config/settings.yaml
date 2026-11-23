@@ -80,7 +80,7 @@ publishing:
   publish_days: {single: Fri, mix: Sun, short: [Tue, Thu, Sat]}
 
 youtube:
-  audited: false            # set true when Google approves your API audit
+  audited: true             # Google audit completed 23 Nov 2026; own API publishes public (verified)
   channel_id: UCgrm66gjrw7Xlj2Ys9AsjAA   # @nikoblazeofficial (used for LIVE links via the public feed)
   enabled: true             # setup done 2026-11-18
   privacy: private          # private | unlisted | public | scheduled  (unverified API projects: private only)
