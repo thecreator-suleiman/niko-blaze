@@ -2,7 +2,7 @@
 
 _Last updated: 23 November 2026_
 
-Niko Blaze Publisher is a private, internal tool operated by Kwizera Suleiman (contact: afrosuleiman@gmail.com).
+Niko Blaze Publisher is a private, internal tool operated by Kwizera Selemani (contact: afrosuleiman@gmail.com).
 It publishes original music by the artist Niko Blaze to the owner's own YouTube channel
 (https://www.youtube.com/@nikoblazeofficial) using YouTube API Services.
 
