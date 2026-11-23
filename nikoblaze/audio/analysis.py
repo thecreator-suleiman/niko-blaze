@@ -85,3 +85,28 @@ def analyze(path) -> dict:
         m["spectral_flatness"] = float(np.median(flat))
     m.update(ebur128(path))
     return m
+
+
+def groove(path, start=0.3, dur=60) -> float:
+    """Beat/groove strength 0-1: how regular the kick and hi-hat pulses are (calibrated: driving Afrobeats/reggae
+    ~0.35+, beatless piano ~0.2)."""
+    i = sf.info(str(path))
+    sr = i.samplerate
+    x, _ = sf.read(str(path), start=int(max(0, i.duration * start - 1) * sr), frames=int(dur * sr), always_2d=True)
+    x = x.mean(1)
+    hop, n = 512, 2048
+    if len(x) < n * 8:
+        return 0.0
+    fr = np.lib.stride_tricks.sliding_window_view(x, n)[::hop] * np.hanning(n)
+    S = np.abs(np.fft.rfft(fr, axis=1))
+    f = np.fft.rfftfreq(n, 1 / sr)
+    fps = sr / hop
+    vals = []
+    for lo, hi in ((30, 150), (6000, 16000)):
+        b = np.log1p(S[:, (f >= lo) & (f < hi)] * 10)
+        flux = np.maximum(np.diff(b, axis=0), 0).sum(1)
+        z = (flux - flux.mean()) / (flux.std() + 1e-9)
+        ac = np.correlate(z, z, "full")[len(z) - 1:]
+        ac /= ac[0] + 1e-9
+        vals.append(float(ac[int(0.25 * fps):int(1.5 * fps)].max()))
+    return round(0.5 * vals[0] + 0.5 * vals[1], 3)

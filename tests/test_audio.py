@@ -44,3 +44,10 @@ def test_alignment():
     starts = [l["start"] for l in out["lines"]]
     assert starts == sorted(starts)
     assert align.align(lyrics, [], 30)["lines"]  # even spread fallback
+
+
+def test_hit_score_gate():
+    from nikoblaze.audio.quality import hit_score
+    strong = hit_score(8, 0.37, 0.6, [{"p": 0.8}] * 40, 100)
+    weak = hit_score(6, 0.22, 0.3, [{"p": 0.4}] * 40, 80)
+    assert strong["score"] >= 70 > weak["score"]

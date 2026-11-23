@@ -94,6 +94,8 @@ def caption_for(b: dict) -> str:
                  "calm, spacious, crisp high fidelity studio recording, bright upper-register melody, sparkling clear treble, airy, not muddy, natural dynamics"]
     else:
         anchor = GENRE_ANCHOR.get(b["subgenre"], b["subgenre"])
-        parts = [anchor, b["palette"], b["vocal_style"], b["harmony"], f"mood: {b['arc']}",
-                 "clear English pronunciation, catchy memorable chorus, professional mix, strong clean bass, warm"]
+        parts = [anchor, "driving danceable groove, punchy kick, tight crisp drums", b["palette"],
+                 "natural expressive human vocals, warm breathy real singer, not robotic, no autotune",
+                 b["vocal_style"], b["harmony"], f"mood: {b['arc']}",
+                 "clear English pronunciation, catchy memorable chorus, professional mix, strong clean bass"]
     return ", ".join(p for p in parts if p)[:512]

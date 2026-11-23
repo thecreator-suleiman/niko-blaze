@@ -10,7 +10,8 @@ SYSTEM = """You are the songwriter for NIKO BLAZE, an independent African male a
 You write original, human, emotionally specific lyrics. Rules:
 - Tell a concrete story: names, places, objects, small details. No vague abstractions.
 - Plain conversational English that is easy to sing. You may add a few widely known words from
-  Nigerian Pidgin, Swahili, Kinyarwanda or isiZulu ONLY when you are certain of the meaning and it fits the setting.
+  Nigerian Pidgin, Swahili or isiZulu ONLY when you are certain of the meaning and it fits the setting.
+  NEVER use Kinyarwanda words.
 - Never copy or quote existing songs. No famous lyric lines, no artist names.
 - Avoid AI cliches (neon, tapestry, symphony, ignite, soar, echoes, whispers, journey, testament, realm, beacon).
 - Each verse line is new. The chorus is short, singable, and has one memorable hook phrase.
@@ -27,6 +28,22 @@ def _history(department: str, n: int = 60):
         "SELECT title, lyrics FROM songs WHERE lyrics IS NOT NULL AND lyrics != '' ORDER BY created_at DESC LIMIT ?",
         (n,)).fetchall()
     return [(r["title"], r["lyrics"]) for r in rows]
+
+
+def rate_hook(data: dict) -> tuple[float, str]:
+    """A&R-style rating of the chorus hook 1-10 by a free LLM (an estimate of catchiness)."""
+    msgs = [{"role": "user", "content": "You are a strict A&R at an Afrobeats/reggae label. Rate how catchy and "
+             "viral the CHORUS HOOK of this song is, 1-10 (10 = instant hit people sing along to; 6 = average). "
+             "Reply ONLY JSON {\"hook\": number, \"why\": \"short reason\"}.\n\nTitle: " + data["title"] +
+             "\n\n" + data["lyrics"][:3500]}]
+    try:
+        t, _ = llm.chat(msgs, temperature=0.2)
+        js = json.loads(re.search(r"\{.*\}", t, re.S).group(0), strict=False)
+        if "hook" not in js:
+            return None, "rating unavailable"
+        return float(js["hook"]), str(js.get("why", ""))[:120]
+    except Exception:
+        return None, "rating unavailable"
 
 
 def _extend(lyrics: str) -> str:
@@ -122,6 +139,11 @@ def write(brief: dict) -> dict:
         if issues == ["too few lines for a full song"]:  # repeat the chorus at the end, as real songs do
             data["lyrics"] = _extend(data["lyrics"])
             issues = quality.check(data["lyrics"], data["title"], history, cfg("lyrics.history_similarity_max", 0.18))
+        if not issues:
+            data["hook_score"], why = rate_hook(data)
+            if data["hook_score"] is not None and data["hook_score"] < cfg("lyrics.min_hook_score", 7) and attempt < int(cfg("lyrics.max_rewrites", 3)) + 2:
+                issues = [f"the hook is not catchy enough ({data['hook_score']}/10: {why}); write a stronger, "
+                          f"simpler, more singable chorus hook that people would repeat"]
         if not issues:
             data["provider"] = provider
             return data

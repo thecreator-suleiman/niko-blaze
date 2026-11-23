@@ -6,6 +6,7 @@ from pathlib import Path
 _tmp = Path(tempfile.mkdtemp(prefix="nbtest-"))
 os.environ["NIKOBLAZE_DB"] = str(_tmp / "test.db")
 os.environ["NIKOBLAZE_WORK"] = str(_tmp / "work")
+os.environ["NB_QUALITY__HIT_CHECK"] = "false"  # synthetic test audio has no real groove/hook
 for k in ("GITHUB_REPOSITORY", "GITHUB_TOKEN", "GH_TOKEN", "GEMINI_API_KEY"):
     os.environ.pop(k, None)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

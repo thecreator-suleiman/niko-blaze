@@ -76,7 +76,7 @@ def test_lyrics_engine_with_mock_llm(monkeypatch):
     monkeypatch.setattr(llm, "chat", fake_chat)
     b = briefs.make_brief("afrobeats", random.Random(1))
     out = engine.write(b)
-    assert out["title"] == "Tomatoes at Dawn" and len(calls) == 2  # first draft rejected, rewrite accepted
+    assert out["title"] == "Tomatoes at Dawn" and len(calls) == 3  # draft rejected, rewrite accepted, hook rated
 
 
 def test_no_llm_means_no_fake_lyrics(monkeypatch):

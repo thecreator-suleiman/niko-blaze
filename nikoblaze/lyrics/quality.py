@@ -64,11 +64,25 @@ def title_issues(title: str, lyrics: str = "") -> list[str]:
     return bad
 
 
+KINYARWANDA = {"ndagukunda", "urukundo", "umutima", "amahoro", "imana", "murakoze", "muraho", "nshuti", "yego",
+               "cyane", "neza", "ubuzima", "inzozi", "ijuru", "amaso", "urugo", "mwiza", "nkwiye", "turi", "ndi",
+               "nawe", "wowe", "njye", "mbega", "ese", "kandi", "ariko", "umukunzi", "dukundane", "komera",
+               "rwanda", "kigali", "mukobwa", "musore", "abana", "ibyishimo", "umunsi", "iwacu", "mama we"}
+
+
+def kinyarwanda_words(lyrics: str) -> list[str]:
+    words = set(re.findall(r"[a-z']+", (lyrics or "").lower()))
+    return sorted(w for w in KINYARWANDA if " " not in w and w in words)
+
+
 def check(lyrics: str, title: str, history: list[tuple[str, str]], max_sim: float = 0.18) -> list[str]:
     """Return a list of problems (empty == acceptable). history = [(title, lyrics), ...]."""
     issues_t = title_issues(title, lyrics)
     if issues_t:
         return issues_t
+    rw = kinyarwanda_words(lyrics)
+    if rw:
+        return [f"remove all Kinyarwanda words ({', '.join(rw[:6])}); use English instead"]
     issues = []
     low = lyrics.lower()
     hits = [b for b in BANNED if b in low]

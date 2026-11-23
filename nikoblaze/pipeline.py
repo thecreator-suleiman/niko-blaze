@@ -61,7 +61,8 @@ def _new_song(dept: str, rng: random.Random, is_single: bool, subgenre=None) -> 
         return None
     if is_single:
         db.kv_set("pending_single", None)
-    b.update({"concept": lyr.get("concept"), "hook": lyr.get("hook"), "lyrics_provider": lyr["provider"]})
+    b.update({"concept": lyr.get("concept"), "hook": lyr.get("hook"), "lyrics_provider": lyr["provider"],
+              "hook_score": lyr.get("hook_score")})
     with db.tx() as c:
         c.execute("INSERT INTO songs(id,department,subgenre,title,brief_json,lyrics,caption,bpm,keyscale,duration,seed,"
                   "fingerprint,is_single,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -276,6 +277,17 @@ def process_song(sid: str, takes: list, src_dir: Path):
         ratio = al["match_ratio"] if (al and words is not None) else None
         n_words = quality.sung_words(words) if instrumental else len(words or [])
         qc = quality.score_take(m, dept, instrumental, ratio, n_words, t.get("genres"))
+        if not instrumental and cfg("quality.hit_check", True):
+            try:
+                g = analysis.groove(path)
+            except Exception:
+                g = None
+            hook = json.loads(song["brief_json"] or "{}").get("hook_score")
+            hs = quality.hit_score(hook, g, ratio, words, qc["score"])
+            qc["hit"] = hs
+            if hs["score"] < cfg("quality.min_hit_score", 70):
+                qc["passed"] = False
+                qc["hard"].append(f"hit potential {hs['score']}% < {cfg('quality.min_hit_score', 70)}% {hs['parts']}")
         results.append((qc, m, al, path))
         db.log("info", "qc", f"{sid} take {t['take']}: score {qc['score']} passed={qc['passed']} "
                              f"{'; '.join(qc['hard'] + qc['warnings'])} eq={fix} genre={(t.get('genres') or [['?']])[0][0]}")

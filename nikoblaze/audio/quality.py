@@ -32,6 +32,21 @@ def sung_words(words: list | None) -> int:
     return len(keep)
 
 
+def hit_score(hook: float | None, groove: float | None, match_ratio: float | None, words: list | None,
+              production: float) -> dict:
+    """Hit potential 0-100 (an estimate, not a real probability): hook strength (A&R rating of the lyrics),
+    groove (beat strength), natural/clear vocals (how clearly the sung words are understood) and production."""
+    def c(v):
+        return max(0.0, min(1.0, v))
+    hook_p = c(((hook or 6) - 4) / 5)                       # 9-10/10 -> full marks
+    groove_p = c(((groove or 0.25) - 0.2) / 0.2)            # 0.40+ -> full marks
+    probs = [w.get("p", 0.0) for w in (words or []) if isinstance(w, dict)]
+    clarity = c(((match_ratio or 0) - 0.3) / 0.4) * 0.6 + c(((sum(probs) / len(probs)) if probs else 0.5) - 0.45) / 0.4 * 0.4
+    parts = {"hook": round(35 * hook_p, 1), "groove": round(25 * groove_p, 1), "vocals": round(25 * c(clarity), 1),
+             "production": round(15 * c(production / 100), 1)}
+    return {"score": round(sum(parts.values())), "parts": parts}
+
+
 def genre_issue(department: str, genres: list | None) -> str | None:
     """genres = top-5 [label, prob] from the CLAP listener. Fail only if none of the department's
     genres is in the top 3 — the song must actually sound like what its title and labels say."""
