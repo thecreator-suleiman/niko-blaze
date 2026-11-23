@@ -448,22 +448,58 @@ def stream_mix():
     loop2 = wd / "loop_live.mp4"  # YouTube wants a keyframe every <= 4 s
     analysis.ffmpeg("-i", str(loop), "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-g", "60",
            "-keyint_min", "60", "-pix_fmt", "yuv420p", "-an", str(loop2))
-    title = (db.get().execute("SELECT title FROM mixes WHERE id=?", (u["ref_id"],)).fetchone() or {"title": "mix"})["title"]
-    link = f"https://www.youtube.com/{cfg('youtube.channel_handle', '@nikoblazeofficial')}/live"
-    notify.text(f"🔴 LIVE NOW on YouTube — {title}\n{link}")
+    mx = db.get().execute("SELECT * FROM mixes WHERE id=?", (u["ref_id"],)).fetchone()
+    meta = metadata.live(mx["department"], mx["volume"], json.loads(mx["chapters"] or "[]")) if mx else None
+    title = meta["title"] if meta else "1 hour mix"
     db.update("uploads", "id", u["id"], status="streaming")
     db.get().commit()
     url = cfg("youtube.rtmp_url", "rtmp://a.rtmp.youtube.com/live2") + "/" + key
-    r = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-re", "-stream_loop", "-1", "-i", str(loop2),
-                        "-re", "-i", str(audio), "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac",
-                        "-b:a", "256k", "-ar", "48000", "-t", f"{float(parts['duration']):.1f}", "-f", "flv", url],
-                       capture_output=True, text=True)
+    proc = subprocess.Popen(["ffmpeg", "-hide_banner", "-loglevel", "error", "-re", "-stream_loop", "-1", "-i",
+                             str(loop2), "-re", "-i", str(audio), "-map", "0:v", "-map", "1:a", "-c:v", "copy",
+                             "-c:a", "aac", "-b:a", "256k", "-ar", "48000", "-t", f"{float(parts['duration']):.1f}",
+                             "-f", "flv", url], stderr=subprocess.PIPE, text=True)
+    link = f"https://www.youtube.com/{cfg('youtube.channel_handle', '@nikoblazeofficial')}/live"
+    vid = _find_live_video(proc)
+    if vid:
+        link = f"https://youtu.be/{vid}"
+        try:  # own API is audited: set this week's hook title + thumbnail on the running broadcast
+            thumb = storage.download(u["thumb_asset"], wd) if u["thumb_asset"] else None
+            if meta:
+                yt.update_video(vid, meta, thumb)
+            db.update("uploads", "id", u["id"], youtube_id=vid)
+        except Exception as e:
+            db.log("warn", "live", f"could not set live title/thumbnail: {e}")
+    notify.text(f"🔴 LIVE NOW on YouTube — {title}\n{link}")
+    _, err = proc.communicate()
+    r = type("R", (), {"returncode": proc.returncode, "stderr": err or ""})()
     if r.returncode == 0:
         db.update("uploads", "id", u["id"], status="uploaded")
         notify.text(f"✅ Live stream finished — {title}. The replay stays on the channel.")
     else:
         db.update("uploads", "id", u["id"], status="live_pending")
         notify.problem(f"Sunday live stream failed: {r.stderr[-300:]}")
+
+
+def _find_live_video(proc, timeout=600) -> str | None:
+    """The stream-key broadcast gets a video id once YouTube sees the stream; read it from the channel's /live page."""
+    import time
+    import requests
+    cid = db.kv_get("yt_channel_id") or cfg("youtube.channel_id", None)
+    end = time.time() + timeout
+    time.sleep(60)
+    while time.time() < end and proc.poll() is None:
+        try:
+            html = requests.get(f"https://www.youtube.com/channel/{cid}/live", timeout=30,
+                                headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en"}).text
+            m = re.search(r'<link rel="canonical" href="https://www\.youtube\.com/watch\?v=([\w-]{11})"', html) \
+                or re.search(r'"isLive":true.*?"videoId":"([\w-]{11})"', html) \
+                or re.search(r'"videoId":"([\w-]{11})"[^{}]*"isLive":true', html)
+            if m:
+                return m.group(1)
+        except Exception:
+            pass
+        time.sleep(30)
+    return None
 
 
 # ------------------------------------------------------------------ live links

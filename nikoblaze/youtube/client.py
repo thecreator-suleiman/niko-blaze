@@ -41,6 +41,17 @@ def service():
     return build("youtube", "v3", credentials=creds, cache_discovery=False)
 
 
+def update_video(vid: str, meta: dict, thumb=None, category: str = "10"):
+    """Set title/description/tags (+ thumbnail) of one of our own videos, e.g. the running live stream."""
+    from googleapiclient.http import MediaFileUpload
+    yt = service()
+    yt.videos().update(part="snippet", body={"id": vid, "snippet": {
+        "title": meta["title"], "description": meta["description"], "tags": meta["tags"][:30],
+        "categoryId": category}}).execute()
+    if thumb:
+        yt.thumbnails().set(videoId=vid, media_body=MediaFileUpload(str(thumb), mimetype="image/jpeg")).execute()
+
+
 def upload(path, meta: dict, privacy: str, publish_at: str | None = None, thumb=None) -> str:
     from googleapiclient.errors import HttpError
     from googleapiclient.http import MediaFileUpload
