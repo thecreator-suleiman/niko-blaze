@@ -20,6 +20,9 @@ generation:
   batch_overhead_seconds: 900   # install + model download per Kaggle run
   batch_timeout_hours: 11
 
+mixes:
+  mode: live                  # live = streamed Sunday 20:00 Kigali with YT_STREAM_KEY (falls back to upload without it)
+
 schedule:                     # quality over quantity (YouTube "inauthentic content" safe)
   single_department: afrobeats
   single_days: [Mon]          # a new single is generated on these days (published Friday)

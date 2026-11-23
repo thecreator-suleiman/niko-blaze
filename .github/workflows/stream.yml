@@ -1,0 +1,29 @@
+name: Sunday live stream (1-hour mix)
+on:
+  schedule: [{cron: "58 17 * * 0"}]   # Sunday 19:58 Kigali -> live at ~20:00
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: {group: nikoblaze-state, cancel-in-progress: false}
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      YT_STREAM_KEY: ${{ secrets.YT_STREAM_KEY }}
+      UPLOADPOST_API_KEY: ${{ secrets.UPLOADPOST_API_KEY }}
+      UPLOADPOST_USER: ${{ secrets.UPLOADPOST_USER }}
+      ZERNIO_API_KEY: ${{ secrets.ZERNIO_API_KEY }}
+      YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+      YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+      YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: python -m nikoblaze stream
+      - if: always()
+        run: python -m nikoblaze state-push

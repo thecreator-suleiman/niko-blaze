@@ -427,6 +427,45 @@ def _queue_upload(kind: str, ref_id: str, video: Path, thumb: Path, parts: dict 
                   (kind, ref_id, sha, "pending", v_ref, t_ref, db.now(), db.now()))
 
 
+# ------------------------------------------------------------------ Sunday live stream
+def stream_mix():
+    """Stream the newest rendered mix live to YouTube with the channel's stream key (no API, no upload slot)."""
+    import subprocess
+    key = os.environ.get("YT_STREAM_KEY")
+    u = db.get().execute("SELECT * FROM uploads WHERE kind='mix' AND status='live_pending' "
+                         "ORDER BY created_at DESC LIMIT 1").fetchone()
+    if not u:
+        db.log("warn", "live", "no mix ready to stream")
+        notify.problem("Sunday live: no 1-hour mix was ready to stream this week (not enough new tracks yet).")
+        return
+    if not key:
+        db.update("uploads", "id", u["id"], status="pending")  # fall back to a normal upload
+        publish_pending()
+        return
+    wd = work_dir("live", u["ref_id"])
+    parts = json.loads(u["video_asset"])
+    loop, audio = storage.download(parts["loop"], wd), storage.download(parts["audio"], wd)
+    loop2 = wd / "loop_live.mp4"  # YouTube wants a keyframe every <= 4 s
+    analysis.ffmpeg("-i", str(loop), "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-g", "60",
+           "-keyint_min", "60", "-pix_fmt", "yuv420p", "-an", str(loop2))
+    title = (db.get().execute("SELECT title FROM mixes WHERE id=?", (u["ref_id"],)).fetchone() or {"title": "mix"})["title"]
+    link = f"https://www.youtube.com/{cfg('youtube.channel_handle', '@nikoblazeofficial')}/live"
+    notify.text(f"🔴 LIVE NOW on YouTube — {title}\n{link}")
+    db.update("uploads", "id", u["id"], status="streaming")
+    db.get().commit()
+    url = cfg("youtube.rtmp_url", "rtmp://a.rtmp.youtube.com/live2") + "/" + key
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-re", "-stream_loop", "-1", "-i", str(loop2),
+                        "-re", "-i", str(audio), "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac",
+                        "-b:a", "256k", "-ar", "48000", "-t", f"{float(parts['duration']):.1f}", "-f", "flv", url],
+                       capture_output=True, text=True)
+    if r.returncode == 0:
+        db.update("uploads", "id", u["id"], status="uploaded")
+        notify.text(f"✅ Live stream finished — {title}. The replay stays on the channel.")
+    else:
+        db.update("uploads", "id", u["id"], status="live_pending")
+        notify.problem(f"Sunday live stream failed: {r.stderr[-300:]}")
+
+
 # ------------------------------------------------------------------ live links
 def _channel_feed() -> list[tuple[str, str]]:
     """(video_id, title) of the channel's latest uploads from YouTube's public RSS feed (no key, no quota)."""
@@ -683,6 +722,10 @@ def daily_mixes(depts=None):
                                     badge="1 HOUR MIX")
             _queue_upload("mix", mx["id"], out, thumb, parts={
                 "loop": out.parent / f"{out.stem}_layers" / "loop.mp4", "audio": mx["audio"], "duration": mx["duration"]})
+            if cfg("mixes.mode", "live") == "live" and os.environ.get("YT_STREAM_KEY"):
+                # streamed live on Sunday evening instead of uploaded (the stream archive stays on the channel)
+                db.get().execute("UPDATE uploads SET status='live_pending' WHERE ref_id=?", (mx["id"],))
+                db.get().commit()
             db.update("mixes", "id", mx["id"], status="rendered")
             db.log("info", "mix", f"{mx['id']} rendered ({mx['duration'] / 60:.1f} min)")
             shutil.rmtree(mx["dir"], ignore_errors=True)

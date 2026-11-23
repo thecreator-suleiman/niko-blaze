@@ -68,6 +68,8 @@ def main(argv=None):
         pipeline.test_mix(args[0] if args else "relaxation")
     elif cmd == "reprocess":
         pipeline.reprocess(args[0] if args else None)
+    elif cmd == "stream":
+        pipeline.stream_mix()
     elif cmd == "live-check":
         pipeline.announce_live()
     elif cmd == "test-backup":  # send waiting songs to the backup generator (checks the failover path)
