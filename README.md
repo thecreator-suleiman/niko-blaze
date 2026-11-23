@@ -1,5 +1,9 @@
 # NIKO BLAZE — Zero-Budget Autonomous Music Production & YouTube Network
 
+> **Niko Blaze Publisher** — a private publishing tool for the Niko Blaze YouTube channel, using **YouTube API Services**.
+> [Privacy Policy](PRIVACY.md) · [Terms of Service](TERMS.md) · [YouTube Terms of Service](https://www.youtube.com/t/terms) · [Google Privacy Policy](https://policies.google.com/privacy)
+
+
 Original Reggae, Afrobeats/Amapiano and Relaxation music, generated with open-source AI on free GPUs,
 quality-checked, mastered, turned into vinyl-turntable lyric videos, and published to YouTube — all
 orchestrated by GitHub Actions at **zero cost**.
