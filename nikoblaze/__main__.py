@@ -87,6 +87,12 @@ def main(argv=None):
             deleted = f"NOT deleted ({str(e)[:100]}) - delete it in YouTube Studio"
         notify.text(f"🧪 YouTube API test: {'PASSED — own API can publish publicly' if ok else 'still LOCKED private'} "
                     f"(status {st.get('privacyStatus')}); test video {deleted}.")
+    elif cmd == "yt-delete":  # yt-delete <video_id>: remove one of our own videos (e.g. a stray Short)
+        from .youtube import client as ytc
+        ytc.service().videos().delete(id=args[0]).execute()
+        with db.tx() as c:
+            c.execute("UPDATE uploads SET status='cancelled' WHERE youtube_id=?", (args[0],))
+        db.log("info", "publish", f"deleted video {args[0]}")
     elif cmd == "kaggle-restart":  # stuck Kaggle batch: drop it and push again (a new kernel version replaces it)
         rows = db.get().execute("SELECT * FROM batches WHERE provider='kaggle' AND status='running'").fetchall()
         sids = []

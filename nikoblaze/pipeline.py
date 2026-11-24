@@ -382,6 +382,8 @@ def render_single(sid: str, master_wav: Path | None = None):
 def short_starts(song: dict, lines: list) -> list[float]:
     """Pick up to N distinct 45 s windows, preferring where the hook/chorus is sung."""
     n = int(cfg("schedule.shorts_per_single", 3))
+    if n <= 0:
+        return []
     dur = song["master_duration"]
     hook = (json.loads(song["brief_json"]).get("hook") or "").lower()[:25]
     cands = [l["start"] - 1.0 for l in lines if hook and hook[:12] in l["text"].lower()]
