@@ -276,7 +276,8 @@ def process_song(sid: str, takes: list, src_dir: Path):
         al = None if instrumental else align.align(song["lyrics"], words or [], m["duration"])
         ratio = al["match_ratio"] if (al and words is not None) else None
         n_words = quality.sung_words(words) if instrumental else len(words or [])
-        qc = quality.score_take(m, dept, instrumental, ratio, n_words, t.get("genres"))
+        qc = quality.score_take(m, dept, instrumental, ratio, n_words, t.get("genres"),
+                                json.loads(song["brief_json"] or "{}").get("subgenre"))
         if not instrumental and cfg("quality.hit_check", True):
             try:
                 g = analysis.groove(path)

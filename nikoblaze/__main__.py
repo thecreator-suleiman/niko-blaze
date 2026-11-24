@@ -55,7 +55,8 @@ def main(argv=None):
             db.log("info", "manual", "paused — resume first")
         else:
             import random
-            sid = pipeline._new_song(dept, random.Random(), dept == "afrobeats")
+            sub = args[1] if len(args) > 1 else None  # e.g. generate-song afrobeats amapiano
+            sid = pipeline._new_song(dept, random.Random(), dept == "afrobeats", sub)
             if sid:
                 pipeline.submit([sid])
     elif cmd == "retry-production":

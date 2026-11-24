@@ -47,21 +47,29 @@ def hit_score(hook: float | None, groove: float | None, match_ratio: float | Non
     return {"score": round(sum(parts.values())), "parts": parts}
 
 
-def genre_issue(department: str, genres: list | None) -> str | None:
+# Stricter per-style check: Amapiano is house-based (log drum, four-on-the-floor); Afrobeats is West African groove.
+SUBGENRE_OK = {"amapiano": {"House music", "Electronic dance music", "Dance music", "Techno", "Electronic music"},
+               "afrobeats": {"Afrobeat", "Music of Africa"}}
+
+
+def genre_issue(department: str, genres: list | None, subgenre: str | None = None) -> str | None:
     """genres = top-5 [label, prob] from the CLAP listener. Fail only if none of the department's
     genres is in the top 3 — the song must actually sound like what its title and labels say."""
     ok = GENRE_OK.get(department)
     if not ok or not genres:
         return None
+    sub = SUBGENRE_OK.get((subgenre or "").lower())
+    if sub and not any(g in sub for g, _ in genres[:3]):
+        return f"not real {subgenre}: sounds like {genres[0][0]} (needs {', '.join(sorted(sub))})"
     if any(g in ok for g, _ in genres[:3]):
         return None
     return f"wrong genre: sounds like {genres[0][0]} (expected {', '.join(sorted(ok))})"
 
 
 def score_take(m: dict, department: str, instrumental: bool, match_ratio: float | None,
-               recognised_words: int = 0, genres: list | None = None) -> dict:
+               recognised_words: int = 0, genres: list | None = None, subgenre: str | None = None) -> dict:
     hard, warn, score = [], [], 100.0
-    gi = genre_issue(department, genres)
+    gi = genre_issue(department, genres, subgenre)
     if gi and cfg("quality.genre_check", True):
         hard.append(gi)
     q = cfg("quality")

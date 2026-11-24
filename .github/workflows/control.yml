@@ -51,7 +51,7 @@ jobs:
       - name: Run action
         run: |
           case "${{ inputs.action }}" in
-            generate-song) python -m nikoblaze generate-song "${{ inputs.department }}" ;;
+            generate-song) python -m nikoblaze generate-song "${{ inputs.department }}" ${{ inputs.target }} ;;
             generate-mix)  python -m nikoblaze mixes "${{ inputs.department }}" ;;
             test-mix)      python -m nikoblaze test-mix "${{ inputs.department }}" ;;
             withdraw)      python -m nikoblaze withdraw ${{ inputs.target }} ;;
