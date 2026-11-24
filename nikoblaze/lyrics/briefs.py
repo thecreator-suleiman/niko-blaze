@@ -75,7 +75,7 @@ _DARK = {"light tape warmth": "clear and present", "subtle vinyl texture": "cris
 # so the anchors name the defining rhythm instead.
 GENRE_ANCHOR = {
     "afrobeats": "nigerian afrobeats, lagos afropop groove, syncopated west african percussion, talking drum, danceable",
-    "amapiano": "south african amapiano, johannesburg log drum bassline, 112 bpm, shakers, deep house piano chords, dancefloor",
+    "amapiano": "amapiano, south african deep house, four-on-the-floor kick, log drum bass lead, 112 bpm, shakers, house piano chords, club dancefloor",
     "reggae": "reggae, one drop rhythm, offbeat skank guitar, jamaican",
     "roots reggae": "roots reggae, one drop rhythm, offbeat skank guitar, jamaican",
     "lovers rock": "lovers rock reggae, offbeat skank guitar, one drop rhythm",
@@ -94,6 +94,8 @@ def caption_for(b: dict) -> str:
                  "calm, spacious, crisp high fidelity studio recording, bright upper-register melody, sparkling clear treble, airy, not muddy, natural dynamics"]
     else:
         anchor = GENRE_ANCHOR.get(b["subgenre"], b["subgenre"])
+        if b["subgenre"] == "amapiano":  # soul/afrobeat words pulled takes off-genre; keep it a club record
+            return ", ".join([anchor, "steady house beat, rolling log drum, minimal vocals, chanted hook, male vocal, clear English, groovy, punchy mix, deep sub bass, amapiano"])[:512]
         parts = [anchor, "driving danceable groove, punchy kick, tight crisp drums", b["palette"],
                  "natural expressive human vocals, warm breathy real singer, not robotic, no autotune",
                  b["vocal_style"], b["harmony"], f"mood: {b['arc']}",
