@@ -87,6 +87,14 @@ def main(argv=None):
             deleted = f"NOT deleted ({str(e)[:100]}) - delete it in YouTube Studio"
         notify.text(f"🧪 YouTube API test: {'PASSED — own API can publish publicly' if ok else 'still LOCKED private'} "
                     f"(status {st.get('privacyStatus')}); test video {deleted}.")
+    elif cmd == "kaggle-restart":  # stuck Kaggle batch: drop it and push again (a new kernel version replaces it)
+        rows = db.get().execute("SELECT * FROM batches WHERE provider='kaggle' AND status='running'").fetchall()
+        sids = []
+        for b in rows:
+            db.update("batches", "id", b["id"], status="error")
+            sids += json.loads(b["info"])
+        if sids:
+            pipeline.submit(sids, providers=["kaggle"])
     elif cmd == "test-mix":
         pipeline.test_mix(args[0] if args else "relaxation")
     elif cmd == "reprocess":
