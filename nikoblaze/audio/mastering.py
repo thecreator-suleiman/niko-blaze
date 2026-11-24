@@ -37,6 +37,9 @@ def tonal_fix(src, dst, department: str, m: dict) -> dict:
     if m.get("channels", 2) > 1 and m.get("stereo_corr", 1) < 0.1:
         chain.append("extrastereo=m=0.6")  # pull the sides in for mono compatibility
         applied["stereo_narrowed"] = True
+    if not relax:  # vocal songs: clear the low-mid mud and bring the voice forward (presence)
+        chain += ["equalizer=f=320:t=o:w=1.0:g=-1.5", "equalizer=f=3200:t=o:w=1.2:g=2.0"]
+        applied["vocal_presence"] = True
     chain.append("alimiter=limit=0.89:level=false")  # boosts must never clip
     Path(dst).parent.mkdir(parents=True, exist_ok=True)
     ffmpeg("-i", str(src), "-af", ",".join(chain), "-c:a", "pcm_s24le", str(dst))

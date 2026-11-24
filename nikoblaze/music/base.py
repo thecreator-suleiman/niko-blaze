@@ -14,6 +14,7 @@ class Job:
     instrumental: bool
     candidates: int = 2
     language: str = "en"
+    hq: bool = False      # singles: high-quality SFT model (slower, better vocals and mix)
 
     def to_dict(self):
         return asdict(self)

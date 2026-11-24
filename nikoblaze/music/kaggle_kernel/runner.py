@@ -105,7 +105,8 @@ def gen(pipe, job, seed, duration):
         torch.cuda.reset_peak_memory_stats()
     with torch.inference_mode():
         lat = pipe(prompt=job["caption"], lyrics=job["lyrics"], audio_duration=float(duration),
-                   vocal_language=job.get("language", "en"), num_inference_steps=CFG["steps"],
+                   vocal_language=job.get("language", "en"), num_inference_steps=STEPS,
+                   guidance_scale=float(CFG.get("hq_guidance", 7.0)),
                    bpm=job["bpm"], keyscale=job["keyscale"], timesignature="4", generator=g,
                    output_type="latent").audios
         diag = {"lat_finite": bool(torch.isfinite(lat).all()), "lat_absmax": float(lat.float().abs().max())}
@@ -138,10 +139,19 @@ def bad(arr):
 
 
 models = [CFG["model_id"], CFG["fallback_model_id"]]
+HQ_MODEL = CFG.get("hq_model_id") or CFG["fallback_model_id"]
+JOBS = sorted(JOBS, key=lambda j: bool(j.get("hq")))  # fast turbo songs first, then the high-quality singles
 active = models[0]
+STEPS = int(CFG["steps"])
 pipe = load(active, DTYPE)
 manifest["models_loaded"] = [active]
 for job in JOBS:
+    if job.get("hq") and active != HQ_MODEL:  # singles: SFT model, more steps + guidance = cleaner vocals/mix
+        del pipe
+        free()
+        active, STEPS = HQ_MODEL, int(CFG.get("hq_steps", 40))
+        pipe = load(active, DTYPE)
+        manifest["models_loaded"].append(active)
     for c in range(job["candidates"]):
         seed = int(job["seed"]) + c * 7919
         name = f"{job['song_id']}_t{c}.wav"

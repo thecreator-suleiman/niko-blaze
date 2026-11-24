@@ -12,11 +12,15 @@ generation:
   fallback_model_id: ACE-Step/acestep-v15-xl-sft-diffusers   # MIT licence (diffusers format)
   inference_steps: 8          # turbo = 8; raise to 30-50 for sft/base
   candidates_per_song: 2      # generate N takes, keep the best that passes QC
+  hq_singles: true            # singles use the high-quality SFT model (better vocals + mix), ~20 min GPU per take
+  hq_model_id: ACE-Step/acestep-v15-xl-sft-diffusers
+  hq_steps: 40
+  hq_guidance: 7.0
   max_attempts_per_song: 3    # after this, the brief is abandoned (never published)
   kaggle_kernel_slug: niko-blaze-gen
   kaggle_weekly_gpu_hours: 30 # Kaggle free quota (check your account page; Kaggle may change it)
   kaggle_safety_margin_hours: 4
-  est_gpu_seconds_per_take: 90  # conservative T4 estimate incl. transcription; refined from real runs
+  est_gpu_seconds_per_take: 220  # real turbo T4 take incl. decode (Nov 2026); hq singles count x6
   batch_overhead_seconds: 900   # install + model download per Kaggle run
   batch_timeout_hours: 11
 
