@@ -74,8 +74,8 @@ _DARK = {"light tape warmth": "clear and present", "subtle vinyl texture": "cris
 # Strong genre tags first: ACE-Step weighs the start of the prompt most. "not jazz" style negatives don't work,
 # so the anchors name the defining rhythm instead.
 GENRE_ANCHOR = {
-    "afrobeats": "afrobeats, afropop, west african dance rhythm, danceable groove",
-    "amapiano": "amapiano, south african house, log drum, danceable groove",
+    "afrobeats": "nigerian afrobeats, lagos afropop groove, syncopated west african percussion, talking drum, danceable",
+    "amapiano": "south african amapiano, johannesburg log drum bassline, 112 bpm, shakers, deep house piano chords, dancefloor",
     "reggae": "reggae, one drop rhythm, offbeat skank guitar, jamaican",
     "roots reggae": "roots reggae, one drop rhythm, offbeat skank guitar, jamaican",
     "lovers rock": "lovers rock reggae, offbeat skank guitar, one drop rhythm",

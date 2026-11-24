@@ -290,7 +290,7 @@ def process_song(sid: str, takes: list, src_dir: Path):
                 qc["hard"].append(f"hit potential {hs['score']}% < {cfg('quality.min_hit_score', 70)}% {hs['parts']}")
         results.append((qc, m, al, path))
         db.log("info", "qc", f"{sid} take {t['take']}: score {qc['score']} passed={qc['passed']} "
-                             f"{'; '.join(qc['hard'] + qc['warnings'])} eq={fix} genre={(t.get('genres') or [['?']])[0][0]}")
+                             f"{'; '.join(qc['hard'] + qc['warnings'])} hit={(qc.get('hit') or {}).get('score', '-')}% eq={fix} genre={(t.get('genres') or [['?']])[0][0]}")
     passing = sorted([r for r in results if r[0]["passed"]], key=lambda r: -r[0]["score"])
     if not passing:
         reasons = "; ".join(sorted({h for r in results for h in r[0]["hard"] + r[0]["warnings"]})) or "no takes produced"
