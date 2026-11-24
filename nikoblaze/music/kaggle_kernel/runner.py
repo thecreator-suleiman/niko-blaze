@@ -141,8 +141,9 @@ def bad(arr):
 models = [CFG["model_id"], CFG["fallback_model_id"]]
 HQ_MODEL = CFG.get("hq_model_id") or CFG["fallback_model_id"]
 JOBS = sorted(JOBS, key=lambda j: bool(j.get("hq")))  # fast turbo songs first, then the high-quality singles
-active = models[0]
-STEPS = int(CFG["steps"])
+all_hq = bool(JOBS) and all(j.get("hq") for j in JOBS)
+active = HQ_MODEL if all_hq else models[0]
+STEPS = int(CFG.get("hq_steps", 40)) if all_hq else int(CFG["steps"])
 pipe = load(active, DTYPE)
 manifest["models_loaded"] = [active]
 for job in JOBS:
