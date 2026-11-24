@@ -98,6 +98,24 @@ class LatentNaN(RuntimeError):
     pass
 
 
+class TooSlow(Exception):
+    pass
+
+
+def _speed_guard(limit_s):
+    """Abort a take whose projected denoising time exceeds limit_s (protects the weekly GPU budget)."""
+    t0 = time.time()
+
+    def cb(pipe, step, timestep, kw):
+        done = step + 1
+        if done >= 3:
+            proj = (time.time() - t0) / done * STEPS
+            if proj > limit_s:
+                raise TooSlow(f"projected {proj / 60:.0f} min > {limit_s / 60:.0f} min limit")
+        return kw
+    return cb
+
+
 def gen(pipe, job, seed, duration):
     park(pipe, "cuda")  # make sure every part is back on the GPU (a failed take may have left some on CPU)
     g = torch.Generator(DEV).manual_seed(seed)
@@ -107,6 +125,7 @@ def gen(pipe, job, seed, duration):
         lat = pipe(prompt=job["caption"], lyrics=job["lyrics"], audio_duration=float(duration),
                    vocal_language=job.get("language", "en"), num_inference_steps=STEPS,
                    guidance_scale=float(CFG.get("hq_guidance", 7.0)),
+                   callback_on_step_end=_speed_guard(float(CFG.get("max_take_seconds", 1200))),
                    bpm=job["bpm"], keyscale=job["keyscale"], timesignature="4", generator=g,
                    output_type="latent").audios
         diag = {"lat_finite": bool(torch.isfinite(lat).all()), "lat_absmax": float(lat.float().abs().max())}
@@ -165,6 +184,16 @@ for job in JOBS:
             try:
                 arr = gen(pipe, job, seed, duration)
                 err = None if not bad(arr) else "model returned NaN or silence"
+            except TooSlow as e:  # high-quality model too slow on this GPU: finish the batch with turbo
+                err = str(e)
+                arr = None
+                if active != models[0]:
+                    del pipe
+                    free()
+                    active, STEPS = models[0], int(CFG["steps"])
+                    pipe = load(active, DTYPE)
+                    manifest["models_loaded"].append(f"{active} (hq too slow)")
+                    continue
             except LatentNaN as e:
                 err = str(e)
                 arr = None

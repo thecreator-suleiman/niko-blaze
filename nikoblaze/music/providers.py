@@ -62,7 +62,7 @@ class KaggleProvider(Provider):
     def build_kernel(self, jobs: list[Job], dest: Path) -> Path:
         dest.mkdir(parents=True, exist_ok=True)
         conf = {"model_id": cfg("generation.model_id"), "fallback_model_id": cfg("generation.fallback_model_id"),
-                "steps": int(cfg("generation.inference_steps", 8)), "hq_model_id": cfg("generation.hq_model_id"), "hq_steps": int(cfg("generation.hq_steps", 40)), "hq_guidance": float(cfg("generation.hq_guidance", 7.0))}
+                "steps": int(cfg("generation.inference_steps", 8)), "hq_model_id": cfg("generation.hq_model_id"), "hq_steps": int(cfg("generation.hq_steps", 40)), "hq_guidance": float(cfg("generation.hq_guidance", 7.0)), "max_take_seconds": int(cfg("generation.max_take_seconds", 1200))}
         src = RUNNER.read_text().replace("__JOBS__", json.dumps([j.to_dict() for j in jobs])) \
             .replace("__CFG__", json.dumps(conf))
         (dest / "runner.py").write_text(src)
@@ -134,7 +134,7 @@ class LocalAceStepProvider(Provider):
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
         d = work_dir("local_gen", stamp)
         conf = {"model_id": cfg("generation.model_id"), "fallback_model_id": cfg("generation.fallback_model_id"),
-                "steps": int(cfg("generation.inference_steps", 8)), "hq_model_id": cfg("generation.hq_model_id"), "hq_steps": int(cfg("generation.hq_steps", 40)), "hq_guidance": float(cfg("generation.hq_guidance", 7.0)), "out_dir": str(d / "out"), "skip_install": True}
+                "steps": int(cfg("generation.inference_steps", 8)), "hq_model_id": cfg("generation.hq_model_id"), "hq_steps": int(cfg("generation.hq_steps", 40)), "hq_guidance": float(cfg("generation.hq_guidance", 7.0)), "max_take_seconds": int(cfg("generation.max_take_seconds", 1200)), "out_dir": str(d / "out"), "skip_install": True}
         src = RUNNER.read_text().replace("__JOBS__", json.dumps([j.to_dict() for j in jobs])) \
             .replace("__CFG__", json.dumps(conf))
         (d / "runner.py").write_text(src)
@@ -173,7 +173,7 @@ class GhaCpuProvider(Provider):
         bid = f"gha-{stamp}"
         d = work_dir("gha_cpu", stamp)
         conf = {"model_id": cfg("generation.model_id"), "fallback_model_id": cfg("generation.fallback_model_id"),
-                "steps": int(cfg("generation.inference_steps", 8)), "hq_model_id": cfg("generation.hq_model_id"), "hq_steps": int(cfg("generation.hq_steps", 40)), "hq_guidance": float(cfg("generation.hq_guidance", 7.0)), "out_dir": "out", "skip_install": True,
+                "steps": int(cfg("generation.inference_steps", 8)), "hq_model_id": cfg("generation.hq_model_id"), "hq_steps": int(cfg("generation.hq_steps", 40)), "hq_guidance": float(cfg("generation.hq_guidance", 7.0)), "max_take_seconds": int(cfg("generation.max_take_seconds", 1200)), "out_dir": "out", "skip_install": True,
                 "whisper_model": cfg("generation.cpu_whisper_model", "small")}
         (d / f"{bid}.json").write_text(json.dumps({"cfg": conf, "jobs": [j.to_dict() for j in jobs]}))
         storage.upload("gpu-jobs", d / f"{bid}.json")
