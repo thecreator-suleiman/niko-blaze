@@ -34,6 +34,34 @@ def _recent_themes(department: str, n: int = 12) -> list:
     return [json.loads(r["brief_json"]).get("theme") for r in rows if r["brief_json"]]
 
 
+_SPEC_FOR = {"amapiano": "south_african_amapiano", "afrobeats": "nigerian_afrobeats", "roots reggae": "jamaican_reggae",
+             "conscious reggae": "jamaican_reggae", "lovers rock": "jamaican_reggae", "reggae": "jamaican_reggae"}
+
+
+def style_spec(subgenre: str | None) -> dict | None:
+    """Producer style specs (config/style_specs.yaml): genre-true captions, tempo, keys, vocals, hook rules."""
+    import yaml
+    from pathlib import Path
+    key = _SPEC_FOR.get((subgenre or "").lower())
+    p = Path(__file__).resolve().parents[2] / "config" / "style_specs.yaml"
+    if not key or not p.exists():
+        return None
+    return (yaml.safe_load(p.read_text()) or {}).get(key)
+
+
+def _apply_spec(b: dict, rng: random.Random) -> dict:
+    spec = style_spec(b["subgenre"])
+    if not spec or b["instrumental"]:
+        return b
+    b["spec_caption"] = rng.choice(spec["captions"])
+    b["bpm"] = rng.randint(*spec["bpm_range"])
+    b["keyscale"] = rng.choice(spec["best_keys"])
+    b["vocal_style"] = rng.choice(spec["vocal_style"])
+    b["theme"] = rng.choice(spec["lyric_themes"])
+    b["hook_rules"] = spec.get("hook_rules", "")
+    return b
+
+
 def make_brief(department: str, rng: random.Random, subgenre: str | None = None) -> dict:
     d = DEPARTMENTS[department]
     used = _recent_fingerprints()
@@ -60,6 +88,7 @@ def make_brief(department: str, rng: random.Random, subgenre: str | None = None)
             "duration": rng.randint(dur["min"] + 10, dur["max"] - 5),
             "instrumental": instrumental,
         }
+        b = _apply_spec(b, rng)
         b["fingerprint"] = _fingerprint(b)
         if b["fingerprint"] not in used:
             return b
@@ -94,6 +123,13 @@ def caption_for(b: dict) -> str:
                  "calm, spacious, crisp high fidelity studio recording, bright upper-register melody, sparkling clear treble, airy, not muddy, natural dynamics"]
     else:
         anchor = GENRE_ANCHOR.get(b["subgenre"], b["subgenre"])
+        spec = style_spec(b["subgenre"])
+        if spec:  # producer spec: anchor first (model weighs the start most), then one full genre caption
+            cap = b.get("spec_caption") or spec["captions"][0]
+            import re
+            anchor = re.sub(r",?\s*\d+\s*BPM", "", spec["anchor"])  # real tempo goes in the bpm field
+            out = ", ".join([anchor, cap, "clear English vocals"])
+            return out if len(out) <= 512 else out[:512].rsplit(",", 1)[0]
         if b["subgenre"] == "amapiano":  # soul/afrobeat words pulled takes off-genre; keep it a club record
             return ", ".join([anchor, "afro amapiano club anthem, deep rolling log drums, heavy sub bass, punchy bouncy amapiano groove, hypnotic bounce, rhythmic chant-style male vocals, call-and-response chant hook, playful confident energetic, nightlife, clear English, punchy club mix, amapiano"])[:512]
         parts = [anchor, "driving danceable groove, punchy kick, tight crisp drums", b["palette"],

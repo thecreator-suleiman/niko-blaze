@@ -1,0 +1,161 @@
+south_african_amapiano:
+  anchor: "Amapiano groove, syncopated 4/4 kick, deep rolling log drum, crisp shakers, percussive rim clicks, jazzy piano chords, deep house keys, warm sub bass, 112 BPM"
+
+  captions:
+    - "Authentic South African Amapiano, syncopated 4/4 groove, deep rolling log drum bass, crisp shakers, tight rim clicks, warm jazzy piano chords, atmospheric deep house keys, bouncing sub bass, catchy repetitive vocal chants, confident male vocals, playful Zulu slang ad-libs, Johannesburg township dance energy, layered percussion, extended instrumental groove, polished club mix"
+    - "Hard-hitting Pretoria-style Amapiano, punchy syncopated kick, aggressive melodic log drum patterns, rolling bass movement, rapid shakers, sharp percussive clicks, repetitive piano riffs, deep house chords, hypnotic synth textures, energetic male vocal delivery, rhythmic call-and-response chants, street-inspired Zulu phrases, explosive dancefloor drops, clean powerful low end"
+    - "Deep-house Amapiano, steady four-on-the-floor kick, warm rolling log drums, delicate shaker patterns, jazzy electric piano progressions, mellow Rhodes chords, deep rounded bass, spacious atmospheric pads, smooth male vocals, melodic repetitive chorus, subtle vocal chops, sophisticated Johannesburg nightlife atmosphere, hypnotic extended groove, warm professional production"
+    - "Vocal-driven South African Amapiano, syncopated dance kick, bouncy log drum bassline, crisp layered shakers, wooden percussion, bright jazzy piano stabs, deep house chord progression, catchy male vocal hooks, playful Zulu slang ad-libs, chant-style backing vocals, rhythmic vocal pauses, infectious repetitive chorus, energetic township party atmosphere, polished modern production"
+    - "Minimalist private-school Amapiano, spacious syncopated percussion, deep elastic log drum rolls, tight shaker groove, muted kick, sophisticated jazzy piano loops, warm sub bass, subtle atmospheric synth layers, restrained male vocal phrases, hypnotic repetitive chants, gradual percussion builds, elegant deep house influence, stripped-back arrangement, premium club-ready mixing"
+
+  bpm_range: [108, 116]
+  best_keys: ["A minor", "F minor", "G minor", "D minor", "C minor"]
+  time_signature: 4
+  song_structure: "[intro] [verse] [pre-chorus] [chorus] [verse] [chorus] [bridge] [chorus] [outro]"
+
+  vocal_style:
+    - "Relaxed low-register male lead, conversational rhythmic delivery, playful Zulu ad-libs, layered chant responses"
+    - "Confident Pretoria street-style male rap, clipped rhythmic phrasing, energetic spoken ad-libs, group vocal responses"
+    - "Smooth melodic male singing, relaxed phrasing, catchy repeated syllables, subtle octave backing vocals"
+    - "Minimal chant-style male vocals, short rhythmic phrases, spoken interjections, doubled chorus vocals"
+
+  hook_rules: "Build an instantly recognizable 4-8 word phrase, repeat it 4-8 times, use a short rhythmic response after the lead phrase, add playful Zulu slang or memorable syllables, leave space for log drum fills between vocal phrases, make the hook work as a standalone dance challenge."
+
+  lyric_themes:
+    - "Weekend nightlife and township celebrations"
+    - "Confidence and personal success"
+    - "Dancing with friends until sunrise"
+    - "Attraction and playful flirting"
+    - "Expensive dreams and stylish living"
+    - "Celebrating hard work and progress"
+    - "Unstoppable dancefloor energy"
+    - "Good vibes and unforgettable memories"
+
+  sample_hook_lines:
+    - "Yebo, we move all night!"
+    - "Siyajola, feel the vibe!"
+    - "Turn it up, make it bounce!"
+    - "Awu, everybody dance!"
+    - "One more time, don't stop!"
+
+  mix_notes: "Club-focused master around -8 to -7 LUFS integrated, preserve punchy kick transients, make the log drum the dominant bass identity, tight mono sub below 120 Hz, crisp wide shakers, bright but controlled piano, clean vocal presence, dynamic percussion movement, strong sidechain separation and a powerful dancefloor groove."
+
+  avoid_tags:
+    - "R&B ballad"
+    - "Gospel choir"
+    - "Soulful slow jam"
+    - "Cinematic orchestral"
+    - "Acoustic folk"
+    - "Trap 808 beat"
+    - "Reggaeton dembow"
+    - "Jazz fusion"
+    - "Ambient meditation"
+    - "Emotional piano ballad"
+
+nigerian_afrobeats:
+  anchor: "Afrobeats groove, syncopated 4/4 kick, swinging West African percussion, warm rolling bass, crisp shakers, talking drum accents, bright plucked guitar, rhythmic synth melody, 104 BPM"
+
+  captions:
+    - "Modern Lagos Afrobeats, infectious syncopated 4/4 groove, swinging West African percussion, warm rolling bass guitar, crisp shakers, talking drum accents, bright highlife-inspired guitar plucks, smooth melodic male vocals, catchy English and Nigerian Pidgin chorus, playful ad-libs, layered rhythmic percussion, vibrant dancefloor energy, polished contemporary African pop production"
+    - "High-energy Nigerian Afrobeats, bouncy syncopated kick, driving bassline, rapid conga patterns, sharp shekere shakers, talking drum fills, bright palm-muted electric guitar, infectious synth hooks, confident male vocal melodies, rhythmic Pidgin rap phrases, repetitive chant chorus, energetic call-and-response, Lagos street-party atmosphere, punchy modern production"
+    - "Melodic contemporary Afrobeats, laid-back swinging percussion, warm rounded bass, crisp shaker groove, soft talking drum accents, clean highlife guitar riffs, atmospheric synth plucks, smooth male tenor vocals, effortless melodic phrasing, catchy English chorus, playful vocal harmonies, romantic dancefloor bounce, warm tropical atmosphere, spacious radio-ready mixing"
+    - "Afrofusion party anthem, energetic African percussion groove, syncopated kick and snare, rolling live bass, bright guitar chops, layered congas, shekere shakers, rhythmic brass stabs, catchy synth motifs, expressive male vocals, confident Pidgin verses, energetic chant-based chorus, crowd-response ad-libs, vibrant Lagos nightlife atmosphere, full-bodied modern production"
+    - "Minimal groove-driven Nigerian Afrobeats, relaxed syncopated kick, deep melodic bass guitar, delicate shakers, subtle talking drum rolls, repetitive highlife guitar pattern, sparse electronic synth accents, smooth low-register male vocals, conversational Pidgin delivery, addictive short vocal hook, rhythmic pauses, understated percussion layering, sophisticated Lagos sound, clean spacious mix"
+
+  bpm_range: [96, 112]
+  best_keys: ["A minor", "G minor", "E minor", "C major", "F major", "D minor"]
+  time_signature: 4
+  song_structure: "[intro] [verse] [pre-chorus] [chorus] [verse] [chorus] [bridge] [chorus] [outro]"
+
+  vocal_style:
+    - "Smooth male tenor singing, relaxed melodic phrasing, short conversational ad-libs"
+    - "Confident Afro-fusion male vocals, rhythmic melodic rap, expressive English and Pidgin delivery, layered chorus harmonies"
+    - "Light melodic male vocals, airy high-register phrases, catchy repetitive syllables, falsetto touches and vocal doubles"
+    - "Energetic male lead, playful rhythmic singing, spoken Pidgin interjections, group call-and-response backing vocals"
+
+  hook_rules: "Create a memorable 5-10 word melodic phrase, repeat the main line 2-4 times, add a short Pidgin response or vocal tag, use a simple ascending or descending melodic motif, keep the rhythm syncopated and easy to dance to, introduce the hook within the first 45 seconds."
+
+  lyric_themes:
+    - "Celebrating success and personal growth"
+    - "Romantic attraction and chemistry"
+    - "Beautiful nights in Lagos"
+    - "Confidence and self-belief"
+    - "Luxury dreams and enjoying life"
+    - "Dancing and weekend celebrations"
+    - "Loyal friendships and shared victories"
+    - "Travel, adventure and living freely"
+
+  sample_hook_lines:
+    - "Tonight we go higher, higher!"
+    - "Baby, your rhythm dey control me!"
+    - "No dulling, we came to shine!"
+    - "Everybody move when the beat drops!"
+    - "More life, more love, more blessings!"
+
+  mix_notes: "Radio-ready master around -9 to -8 LUFS integrated, warm punchy kick, rounded bass with defined melodic movement, crisp but smooth percussion, bright guitar transients, controlled synth frequencies, upfront clear lead vocals, tasteful stereo backing harmonies, balanced sub frequencies, and enough dynamic space for the groove to breathe."
+
+  avoid_tags:
+    - "Slow R&B ballad"
+    - "Gospel worship"
+    - "Soul choir"
+    - "Sad acoustic pop"
+    - "Country guitar"
+    - "Jazz lounge"
+    - "Cinematic soundtrack"
+    - "Heavy dubstep"
+    - "Trap drill"
+    - "Orchestral pop"
+
+jamaican_reggae:
+  anchor: "Jamaican one-drop rhythm, laid-back 4/4 drums, deep round reggae bass, offbeat skank guitar, bubbling organ, rimshot snare, crisp hi-hat, warm analog keys, 76 BPM"
+
+  captions:
+    - "Authentic Jamaican roots reggae, steady one-drop drum pattern, deep round melodic bassline, crisp offbeat skank guitar, bubbling Hammond organ, warm electric piano chords, rimshot snare, relaxed male Jamaican vocals, natural island phrasing, positive conscious lyrics, melodic chorus harmonies, subtle dub-style echo, organic live-band groove, warm analog production"
+    - "Modern roots reggae, heavy one-drop kick and rimshot, deep rolling reggae bass, sharp offbeat guitar chops, bubbling organ bubble, syncopated percussion, melodic electric piano, confident male Jamaican vocal delivery, catchy repeated chorus, uplifting English lyrics, subtle vocal call-and-response, organic drum feel, spacious spring reverb, rich bass-forward Jamaican studio sound"
+    - "Jamaican lovers rock reggae, smooth relaxed one-drop rhythm, warm rounded bass guitar, gentle offbeat skank guitar, soft bubbling organ, sweet electric piano chords, delicate percussion, romantic male tenor singing, smooth melodic phrasing, intimate backing harmonies, memorable repeated chorus, affectionate English lyrics, gentle rhythmic sway, polished warm analog mix"
+    - "Contemporary danceable reggae, tight one-drop drums, punchy deep bass groove, bright offbeat guitar skanks, bubbling digital organ, crisp hi-hats, syncopated hand percussion, melodic keyboard stabs, energetic Jamaican male vocals, rhythmic singjay verses, catchy group chorus, playful patois ad-libs, uplifting party atmosphere, modern clean production"
+    - "Deep roots and dub reggae, spacious one-drop drum groove, powerful sustained bass guitar, precise offbeat guitar chops, bubbling organ patterns, vintage electric piano, subtle percussion accents, expressive low-register Jamaican male vocals, relaxed rhythmic phrasing, short chant chorus, dub echo on vocal endings, spring reverb textures, organic live-band warmth, deep immersive mix"
+
+  bpm_range: [68, 88]
+  best_keys: ["A minor", "G major", "D major", "E minor", "C major", "F major"]
+  time_signature: 4
+  song_structure: "[intro] [verse] [chorus] [verse] [chorus] [bridge] [chorus] [outro]"
+
+  vocal_style:
+    - "Relaxed Jamaican male tenor, melodic roots singing, natural Jamaican accent, gentle chorus harmonies and short ad-libs"
+    - "Low-register conscious reggae singer, steady conversational delivery, rhythmic spoken phrases, group chant backing vocals"
+    - "Smooth lovers rock male vocalist, sweet melodic tenor, sustained melodic endings, layered romantic backing harmonies"
+    - "Jamaican singjay delivery, rhythmic half-sung verses, playful patois ad-libs, energetic call-and-response chorus"
+
+  hook_rules: "Build a simple 4-8 word melodic refrain, repeat it 3-5 times, use a warm group response after the lead phrase, keep the melody easy to sing, let the one-drop rhythm breathe between lines, and use short Jamaican patois expressions naturally without overcrowding the chorus."
+
+  lyric_themes:
+    - "Unity, friendship and togetherness"
+    - "Love and romantic connection"
+    - "Positive living and gratitude"
+    - "Freedom and enjoying life"
+    - "Peace, community and good vibes"
+    - "Sunshine, beaches and island celebrations"
+    - "Confidence and overcoming obstacles"
+    - "Dancing together under the stars"
+
+  sample_hook_lines:
+    - "One love, we rise together!"
+    - "Sweet love, carry me away!"
+    - "Sunshine shining on my way!"
+    - "Good vibes, let the music play!"
+    - "Together we dance until daylight!"
+
+  mix_notes: "Warm analog-style master around -10 to -8 LUFS integrated, deep sustained bass guitar with strong fundamental notes, natural one-drop drum dynamics, clear offbeat guitar attacks, warm bubbling organ, smooth top end, organic stereo placement, controlled spring reverb and dub delay, upfront vocals, and a steady spacious groove."
+
+  avoid_tags:
+    - "Afrobeats"
+    - "Amapiano log drum"
+    - "Trap 808"
+    - "Drill beat"
+    - "EDM festival drop"
+    - "Dubstep wobble"
+    - "Gospel choir"
+    - "Soul ballad"
+    - "Cinematic orchestral"
+    - "Heavy metal guitar"

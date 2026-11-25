@@ -123,7 +123,8 @@ def write(brief: dict) -> dict:
             f"Write at least {lines_target} sung lines in total (section tags do not count) for a "
             f"{brief['duration']}s song. Each verse needs 8 lines, each chorus 4-6 lines. "
             f"Use exactly these sections in order: {', '.join(brief['structure'])}.\n"
-            f"Do not reuse these titles: {recent_titles or 'none yet'}.")
+            + (f"Hook rules for this genre: {brief['hook_rules']}\n" if brief.get("hook_rules") else "")
+            + f"Do not reuse these titles: {recent_titles or 'none yet'}.")
     messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}]
     last_issues, bad_providers = [], set()
     for attempt in range(int(cfg("lyrics.max_rewrites", 3)) + 3):
