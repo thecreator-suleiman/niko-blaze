@@ -115,14 +115,14 @@ class TooSlow(Exception):
     pass
 
 
-def _speed_guard(limit_s):
+def _speed_guard(limit_s, steps=None):
     """Abort a take whose projected denoising time exceeds limit_s (protects the weekly GPU budget)."""
     t0 = time.time()
 
     def cb(pipe, step, timestep, kw):
         done = step + 1
         if done >= 3:
-            proj = (time.time() - t0) / done * STEPS
+            proj = (time.time() - t0) / done * (steps or STEPS)
             if proj > limit_s:
                 raise TooSlow(f"projected {proj / 60:.0f} min > {limit_s / 60:.0f} min limit")
         return kw
@@ -164,15 +164,16 @@ def gen(pipe, job, seed, duration):
         torch.cuda.reset_peak_memory_stats()
     with torch.inference_mode():
         ref = load_ref(job.get("reference_url"))
+        n_steps = int(job.get("steps") or STEPS)
         extra = {"reference_audio": ref} if ref is not None else {}
         if ref is not None and job.get("style_mode") == "cover":  # keep the reference's groove, new song on top
             n = min(ref.shape[-1], int(float(duration) * 48000))
             extra.update(task_type="cover", src_audio=ref[:, :n],
                          audio_cover_strength=float(CFG.get("cover_strength", 0.5)))
         kw = dict(prompt=job["caption"], lyrics=job["lyrics"], audio_duration=float(duration),
-                  vocal_language=job.get("language", "en"), num_inference_steps=STEPS,
+                  vocal_language=job.get("language", "en"), num_inference_steps=n_steps,
                   guidance_scale=float(CFG.get("hq_guidance", 7.0)),
-                  callback_on_step_end=_speed_guard(float(CFG.get("max_take_seconds", 1200))),
+                  callback_on_step_end=_speed_guard(float(CFG.get("max_take_seconds", 1200)), n_steps),
                   bpm=job["bpm"], keyscale=job["keyscale"], timesignature="4", generator=g,
                   output_type="latent")
         try:

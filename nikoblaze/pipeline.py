@@ -172,10 +172,11 @@ def submit(song_ids: list[str], providers: list[str] | None = None):
         db.log("warn", "generate", "generation.provider is 'none' — songs stay planned")
         return
     rows = [db.get().execute("SELECT * FROM songs WHERE id=?", (i,)).fetchone() for i in song_ids]
-    jobs = [Job(song_id=r["id"], caption=_caption(r), lyrics=_model_lyrics(r["lyrics"]), hq=bool(r["is_single"]) and cfg("generation.hq_singles", True) and not _style_ref(r, "mode"), duration=r["duration"], bpm=r["bpm"],
+    jobs = [Job(song_id=r["id"], caption=_caption(r), lyrics=_model_lyrics(r["lyrics"]), hq=bool(r["is_single"]) and cfg("generation.hq_singles", True) or bool(_style_ref(r, "mode")), duration=r["duration"], bpm=r["bpm"],
                 keyscale=r["keyscale"], seed=r["seed"] + r["attempts"] * 104729,
                 instrumental=r["department"] == "relaxation", candidates=cfg("generation.candidates_per_song"),
-                reference_url=_style_ref(r), style_mode=_style_ref(r, "mode"))
+                reference_url=_style_ref(r), style_mode=_style_ref(r, "mode"),
+                steps=int(cfg("generation.cover_steps", 16)) if _style_ref(r, "mode") else 0)
             for r in rows]
     bid, prov, errs = None, None, []
     for n in names:

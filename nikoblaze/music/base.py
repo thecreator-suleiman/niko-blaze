@@ -16,7 +16,8 @@ class Job:
     language: str = "en"
     hq: bool = False      # singles: high-quality SFT model (slower, better vocals and mix)
     reference_url: str = ""
-    style_mode: str = ""      # "cover": rebuild the reference's groove with new lyrics/vocals  # style reference audio (e.g. Kwizera's own "Nyash Energy" for amapiano)
+    style_mode: str = ""
+    steps: int = 0            # per-job override (0 = model default)      # "cover": rebuild the reference's groove with new lyrics/vocals  # style reference audio (e.g. Kwizera's own "Nyash Energy" for amapiano)
 
     def to_dict(self):
         return asdict(self)

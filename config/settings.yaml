@@ -15,6 +15,7 @@ generation:
   style_refs:          # own reference tracks: generated songs copy their sound/timbre
     amapiano: assets/refs/nyash_energy.mp3
   style_modes: {amapiano: cover}
+  cover_steps: 16      # cover needs the SFT model (has the audio tokenizer); fewer steps keep it under the time limit
   cover_strength: 0.8   # lower = freer new song, higher = closer to the reference groove
   hq_singles: true            # singles use the high-quality SFT model (better vocals + mix), ~20 min GPU per take
   hq_model_id: ACE-Step/acestep-v15-xl-sft-diffusers
