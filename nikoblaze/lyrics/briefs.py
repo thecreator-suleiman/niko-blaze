@@ -95,7 +95,7 @@ def caption_for(b: dict) -> str:
     else:
         anchor = GENRE_ANCHOR.get(b["subgenre"], b["subgenre"])
         if b["subgenre"] == "amapiano":  # soul/afrobeat words pulled takes off-genre; keep it a club record
-            return ", ".join([anchor, "steady house beat, rolling log drum, minimal vocals, chanted hook, male vocal, clear English, groovy, punchy mix, deep sub bass, amapiano"])[:512]
+            return ", ".join([anchor, "afro amapiano club anthem, deep rolling log drums, heavy sub bass, punchy bouncy amapiano groove, hypnotic bounce, rhythmic chant-style male vocals, call-and-response chant hook, playful confident energetic, nightlife, clear English, punchy club mix, amapiano"])[:512]
         parts = [anchor, "driving danceable groove, punchy kick, tight crisp drums", b["palette"],
                  "natural expressive human vocals, warm breathy real singer, not robotic, no autotune",
                  b["vocal_style"], b["harmony"], f"mood: {b['arc']}",
