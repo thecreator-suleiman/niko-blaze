@@ -152,6 +152,10 @@ def gen(pipe, job, seed, duration):
     with torch.inference_mode():
         ref = load_ref(job.get("reference_url"))
         extra = {"reference_audio": ref} if ref is not None else {}
+        if ref is not None and job.get("style_mode") == "cover":  # keep the reference's groove, new song on top
+            n = min(ref.shape[-1], int(float(duration) * 48000))
+            extra.update(task_type="cover", src_audio=ref[:, :n],
+                         audio_cover_strength=float(CFG.get("cover_strength", 0.5)))
         kw = dict(prompt=job["caption"], lyrics=job["lyrics"], audio_duration=float(duration),
                   vocal_language=job.get("language", "en"), num_inference_steps=STEPS,
                   guidance_scale=float(CFG.get("hq_guidance", 7.0)),
@@ -161,7 +165,7 @@ def gen(pipe, job, seed, duration):
         try:
             lat = pipe(**kw, **extra).audios
             if extra:
-                manifest.setdefault("diag", []).append({"reference_used": True})
+                manifest.setdefault("diag", []).append({"reference_used": True, "mode": job.get("style_mode") or "timbre"})
         except (TypeError, ValueError, RuntimeError) as e:
             if not extra or "TooSlow" in type(e).__name__:
                 raise

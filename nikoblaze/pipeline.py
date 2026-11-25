@@ -133,11 +133,13 @@ def _caption(r) -> str:
         return r["caption"]
 
 
-def _style_ref(r) -> str:
+def _style_ref(r, what="url") -> str:
     try:
         sub = (json.loads(r["brief_json"] or "{}").get("subgenre") or "").lower()
     except Exception:
         return ""
+    if what == "mode":
+        return (cfg("generation.style_modes", {}) or {}).get(sub, "")
     path = (cfg("generation.style_refs", {}) or {}).get(sub)
     return f"https://raw.githubusercontent.com/thecreator-suleiman/niko-blaze/main/{path}" if path else ""
 
@@ -173,7 +175,7 @@ def submit(song_ids: list[str], providers: list[str] | None = None):
     jobs = [Job(song_id=r["id"], caption=_caption(r), lyrics=_model_lyrics(r["lyrics"]), hq=bool(r["is_single"]) and cfg("generation.hq_singles", True), duration=r["duration"], bpm=r["bpm"],
                 keyscale=r["keyscale"], seed=r["seed"] + r["attempts"] * 104729,
                 instrumental=r["department"] == "relaxation", candidates=cfg("generation.candidates_per_song"),
-                reference_url=_style_ref(r))
+                reference_url=_style_ref(r), style_mode=_style_ref(r, "mode"))
             for r in rows]
     bid, prov, errs = None, None, []
     for n in names:
