@@ -75,7 +75,8 @@ def _new_song(dept: str, rng: random.Random, is_single: bool, subgenre=None) -> 
 
 def week_mix_department(when=None) -> str:
     rot = cfg("schedule.mix_rotation")
-    return rot[(when or datetime.now(TZ)).isocalendar().week % len(rot)]
+    # weeks run Sunday -> Saturday (live on Saturday), so Sunday already counts toward the next mix
+    return rot[((when or datetime.now(TZ)) + timedelta(days=1)).isocalendar().week % len(rot)]
 
 
 def plan(extra: dict | None = None):
@@ -92,7 +93,7 @@ def plan(extra: dict | None = None):
     wanted = []
     if weekday in sch["single_days"]:
         wanted.append((sch["single_department"], True))
-    if weekday != "Sun":  # Mon-Sat build the library for this week's hour mix
+    if weekday != "Sat":  # Sun-Fri build the library for this week's hour mix
         wanted += [(week_mix_department(), False)] * int(sch["mix_tracks_per_day"])
     for dept, n in (extra or {}).items():
         wanted += [(dept, dept == sch["single_department"])] * n
@@ -470,7 +471,7 @@ def _queue_upload(kind: str, ref_id: str, video: Path, thumb: Path, parts: dict 
                   (kind, ref_id, sha, "pending", v_ref, t_ref, db.now(), db.now()))
 
 
-# ------------------------------------------------------------------ Sunday live stream
+# ------------------------------------------------------------------ Saturday live stream
 def stream_mix():
     """Stream the newest rendered mix live to YouTube with the channel's stream key (no API, no upload slot)."""
     import subprocess
@@ -479,7 +480,7 @@ def stream_mix():
                          "ORDER BY created_at DESC LIMIT 1").fetchone()
     if not u:
         db.log("warn", "live", "no mix ready to stream")
-        notify.problem("Sunday live: no 1-hour mix was ready to stream this week (not enough new tracks yet).")
+        notify.problem("Saturday live: no 1-hour mix was ready to stream this week (not enough new tracks yet).")
         return
     if not key:
         db.update("uploads", "id", u["id"], status="pending")  # fall back to a normal upload
@@ -520,7 +521,7 @@ def stream_mix():
         notify.text(f"✅ Live stream finished — {title}. The replay stays on the channel.")
     else:
         db.update("uploads", "id", u["id"], status="live_pending")
-        notify.problem(f"Sunday live stream failed: {r.stderr[-300:]}")
+        notify.problem(f"Saturday live stream failed: {r.stderr[-300:]}")
 
 
 def _find_live_video(proc, timeout=600) -> str | None:
@@ -810,7 +811,7 @@ def daily_mixes(depts=None):
             _queue_upload("mix", mx["id"], out, thumb, parts={
                 "loop": out.parent / f"{out.stem}_layers" / "loop.mp4", "audio": mx["audio"], "duration": mx["duration"]})
             if cfg("mixes.mode", "live") == "live" and os.environ.get("YT_STREAM_KEY"):
-                # streamed live on Sunday evening instead of uploaded (the stream archive stays on the channel)
+                # streamed live on Saturday evening instead of uploaded (the stream archive stays on the channel)
                 db.get().execute("UPDATE uploads SET status='live_pending' WHERE ref_id=?", (mx["id"],))
                 db.get().commit()
             db.update("mixes", "id", mx["id"], status="rendered")

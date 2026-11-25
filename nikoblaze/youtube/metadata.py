@@ -58,18 +58,18 @@ def short(song: dict) -> dict:
 
 
 LIVE_TITLES = {
-    "reggae": "🔴 Reggae Sunday LIVE – 1 Hour of Feel-Good Roots Vibes | Niko Blaze",
+    "reggae": "🔴 Reggae Saturday LIVE – 1 Hour of Feel-Good Roots Vibes | Niko Blaze",
     "afrobeats": "🔴 Afrobeats & Amapiano LIVE – 1 Hour Non-Stop Party Mix 🔥 | Niko Blaze",
     "relaxation": "🔴 1 Hour Calm Piano LIVE – Relax, Study & Sleep | Niko Blaze",
 }
 
 
 def live(dept: str, volume: int, chapters: list) -> dict:
-    """Title/description for the Sunday live stream of the weekly mix."""
+    """Title/description for the Saturday live stream of the weekly mix."""
     label = DEPARTMENTS[dept]["label"]
     title = LIVE_TITLES.get(dept, f"🔴 {label} LIVE – 1 Hour Mix | Niko Blaze")[:100]
     lines = "\n".join(clean(name) for _, name in chapters)
     desc = (f"Live now: one hour of brand-new original {label.lower()} music by Niko Blaze (Vol. {volume}). "
             f"Pre-recorded mix, streamed live — say hi in the chat and tell us where you're listening from!\n\n"
-            f"TRACKLIST\n{lines}\n\nSubscribe for a new single every week and a new live mix every Sunday.\n\n#NikoBlaze")
+            f"TRACKLIST\n{lines}\n\nSubscribe for a new single every week and a new live mix every Saturday.\n\n#NikoBlaze")
     return {"title": title, "description": clean(desc)[:4900], "tags": _tags(dept, ["live", "1 hour mix"])}

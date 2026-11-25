@@ -1,6 +1,6 @@
-name: Sunday live stream (1-hour mix)
+name: Saturday live stream (1-hour mix)
 on:
-  schedule: [{cron: "58 17 * * 0"}]   # Sunday 19:58 Kigali -> live at ~20:00
+  schedule: [{cron: "58 17 * * 6"}]   # Saturday 19:58 Kigali -> live at ~20:00
   workflow_dispatch:
 permissions:
   contents: write
