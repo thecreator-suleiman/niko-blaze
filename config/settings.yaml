@@ -14,7 +14,7 @@ generation:
   candidates_per_song: 2      # generate N takes, keep the best that passes QC
   style_refs:          # own reference tracks: generated songs copy their sound/timbre
     amapiano: assets/refs/nyash_energy_instrumental.mp3   # vocals removed (Demucs) so new vocals come through
-  style_modes: {amapiano: cover}
+  style_modes: {}      # cover mode copied the instrumental too closely: no clear vocals (lyric match 0-31%)
   cover_steps: 24      # cover needs the SFT model (has the audio tokenizer); fewer steps keep it under the time limit
   cover_strength: 0.65   # lower = freer new song, higher = closer to the reference groove
   hq_singles: true            # singles use the high-quality SFT model (better vocals + mix), ~20 min GPU per take
