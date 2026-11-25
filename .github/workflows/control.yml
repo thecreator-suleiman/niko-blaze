@@ -49,16 +49,19 @@ jobs:
       - uses: ./.github/actions/setup
       - run: pip install -q kaggle six faster-whisper
       - name: Run action
+        env:
+          TARGET: ${{ inputs.target }}
         run: |
+          set -f
           case "${{ inputs.action }}" in
-            generate-song) python -m nikoblaze generate-song "${{ inputs.department }}" ${{ inputs.target }} ;;
+            generate-song) python -m nikoblaze generate-song "${{ inputs.department }}" $TARGET ;;
             generate-mix)  python -m nikoblaze mixes "${{ inputs.department }}" ;;
             test-mix)      python -m nikoblaze test-mix "${{ inputs.department }}" ;;
-            approve)       python -m nikoblaze approve ${{ inputs.target }} ;;
-            send-approval) python -m nikoblaze send-approval ${{ inputs.target }} ;;
-            withdraw)      python -m nikoblaze withdraw ${{ inputs.target }} ;;
-            reschedule)    python -m nikoblaze reschedule ${{ inputs.target }} ;;
-            yt-delete)     python -m nikoblaze yt-delete ${{ inputs.target }} ;;
+            approve)       python -m nikoblaze approve $TARGET ;;
+            send-approval) python -m nikoblaze send-approval $TARGET ;;
+            withdraw)      python -m nikoblaze withdraw $TARGET ;;
+            reschedule)    python -m nikoblaze reschedule $TARGET ;;
+            yt-delete)     python -m nikoblaze yt-delete $TARGET ;;
             gpu-fetch)     mkdir -p gpu_out && kaggle kernels output "$KAGGLE_USERNAME/niko-blaze-gen" -p gpu_out || true ;;
             *)             python -m nikoblaze "${{ inputs.action }}" ;;
           esac
