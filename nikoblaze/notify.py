@@ -22,6 +22,18 @@ def _call(method, data=None, files=None):
     return r.json()
 
 
+def audio(path, caption: str) -> bool:
+    if not enabled():
+        return False
+    try:
+        with open(path, "rb") as f:
+            _call("sendAudio", {"caption": caption[:1000]}, files={"audio": f})
+        return True
+    except Exception as e:
+        print(f"[WARN] telegram audio: {e}")
+        return False
+
+
 def text(msg: str) -> bool:
     if not enabled():
         return False

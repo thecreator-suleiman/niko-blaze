@@ -324,11 +324,37 @@ def process_song(sid: str, takes: list, src_dir: Path):
               master_duration=mm["duration"], qc_score=qc["score"],
               qc_json=json.dumps({"qc": qc, "metrics": m, "master": mm}), align_json=json.dumps(al) if al else None)
     db.log("info", "master", f"{sid} mastered ({mm['lufs']} LUFS, {mm['true_peak']} dBTP) and stored")
+    if song["is_single"] and cfg("publishing.require_approval", True) and not db.kv_get(f"approved:{sid}"):
+        db.update("songs", "id", sid, status="awaiting_approval")
+        send_for_approval(sid, master_wav)
+        return
     if song["is_single"]:
         try:
             render_single(sid, master_wav)
         except Exception as e:  # audio is safe in storage; repair_singles() re-renders on the next run
             db.log("error", "render", f"{sid}: render failed, will retry: {type(e).__name__}: {str(e)[:300]}")
+
+
+def send_for_approval(sid: str, master_wav: Path | None = None):
+    """Nothing is posted until Kwizera listens and approves (control: approve <id> / withdraw <id>)."""
+    import subprocess, tempfile
+    song = db.get().execute("SELECT * FROM songs WHERE id=?", (sid,)).fetchone()
+    if master_wav is None:
+        master_wav = storage.download(song["master_asset"], Path(tempfile.mkdtemp()))
+    mp3 = Path(tempfile.mkdtemp()) / f"{song['title']}.mp3"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(master_wav), "-b:a", "256k", str(mp3)], check=True)
+    sub = json.loads(song["brief_json"] or "{}").get("subgenre", "")
+    notify.audio(mp3, f"🎧 APPROVAL NEEDED: {song['title']} ({sub})\nID: {sid}\n"
+                      f"Approve: Control → approve, target {sid}\nReject: Control → withdraw, target {sid}")
+    db.log("info", "approval", f"{sid} sent for approval")
+
+
+def approve(sid: str):
+    db.kv_set(f"approved:{sid}", "1")
+    db.update("songs", "id", sid, status="ready")
+    render_single(sid)
+    db.log("info", "approval", f"{sid} approved and queued for publishing")
+    notify.text(f"✅ Approved: {sid} — rendering and scheduling now.")
 
 
 def repair_singles():
@@ -628,6 +654,14 @@ def cancel_song(sid: str, reason: str):
                 d = requests.delete(f"https://api.upload-post.com/api/uploadposts/schedule/{j['job_id']}",
                                     headers=h, timeout=60)
                 cancelled += d.ok
+    for u in ups:  # videos already scheduled through our own YouTube API
+        if u["youtube_id"] and u["status"] != "cancelled":
+            try:
+                from .youtube import client as ytc
+                ytc.service().videos().delete(id=u["youtube_id"]).execute()
+                db.log("warn", "publish", f"deleted video {u['youtube_id']}")
+            except Exception as e:
+                db.log("warn", "publish", f"could not delete {u['youtube_id']}: {str(e)[:200]}")
     if cancelled:
         db.add_usage("upload_post", -cancelled, publisher._month())  # refunded slots
     with db.tx() as c:

@@ -61,6 +61,10 @@ def main(argv=None):
                 pipeline.submit([sid])
     elif cmd == "retry-production":
         pipeline.retry_production()
+    elif cmd == "approve":
+        pipeline.approve(args[0])
+    elif cmd == "send-approval":
+        pipeline.send_for_approval(args[0])
     elif cmd == "withdraw":  # withdraw <song_id> [reason...]: cancel scheduled posts, reject the song
         pipeline.cancel_song(args[0], " ".join(args[1:]) or "withdrawn manually")
     elif cmd == "reschedule":  # reschedule <song_id> <HH:MM | YYYY-MM-DD HH:MM> (Kigali time)
