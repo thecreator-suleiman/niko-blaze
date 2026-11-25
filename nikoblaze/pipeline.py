@@ -820,16 +820,7 @@ def daily_mixes(depts=None):
                                     badge="1 HOUR MIX")
             _queue_upload("mix", mx["id"], out, thumb, parts={
                 "loop": out.parent / f"{out.stem}_layers" / "loop.mp4", "audio": mx["audio"], "duration": mx["duration"]})
-            try:  # preview for Kwizera: nothing streams until he approves it
-                import subprocess
-                prev = mx["dir"] / f"{mx['id']}_preview.mp3"
-                subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(mx["audio"]), "-ac", "2", "-b:a", "96k",
-                                str(prev)], check=True)
-                tl = "\n".join(f"{int(t // 60):02d}:{int(t % 60):02d} {name}" for t, name in (mx.get("chapters") or [])[:25])
-                notify.audio(prev, f"🎧 SATURDAY LIVE PREVIEW: 1 hour {dept} mix\nID: {mx['id']}\n{tl}\n\n"
-                                   f"Approve: Control → approve, target {mx['id']}\nNot approved = no live.")
-            except Exception as e:
-                db.log("warn", "mix", f"preview not sent: {str(e)[:200]}")
+            send_mix_preview(mx, dept, "Goes live Saturday 20:00 Kigali.")
             if cfg("mixes.mode", "live") == "live" and os.environ.get("YT_STREAM_KEY"):
                 # streamed live on Saturday evening instead of uploaded (the stream archive stays on the channel)
                 db.get().execute("UPDATE uploads SET status='live_pending' WHERE ref_id=?", (mx["id"],))
@@ -840,6 +831,19 @@ def daily_mixes(depts=None):
         except Exception as e:
             db.log("error", "mix", f"{dept}: {e}")
     publish_pending()
+
+
+def send_mix_preview(mx: dict, dept: str, note: str):
+    """mp3 of the hour mix + tracklist to Kwizera's Telegram (96 kbps keeps an hour under the 50 MB bot limit)."""
+    import subprocess
+    try:
+        prev = mx["dir"] / f"{mx['id']}_preview.mp3"
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(mx["audio"]), "-ac", "2", "-b:a", "96k",
+                        str(prev)], check=True)
+        tl = "\n".join(f"{int(t // 60):02d}:{int(t % 60):02d} {name}" for t, name in (mx.get("chapters") or [])[:25])
+        notify.audio(prev, f"🎧 LIVE MIX PREVIEW: {dept} ({mx['duration'] / 60:.0f} min)\nID: {mx['id']}\n{tl}\n\n{note}")
+    except Exception as e:
+        db.log("warn", "mix", f"preview not sent: {str(e)[:200]}")
 
 
 def test_mix(dept: str = "relaxation"):
@@ -860,6 +864,7 @@ def test_mix(dept: str = "relaxation"):
         thumbnails.make(dept, f"1 Hour {dept.title()} Mix", mx["dir"] / f"{mx['id']}_thumb.jpg", badge="1 HOUR MIX")
         loop = out.parent / f"{out.stem}_layers" / "loop.mp4"
         ok = loop.exists() and Path(mx["audio"]).exists()
+        send_mix_preview(mx, dept, "Preview of the tracks ready so far (not final, nothing posted).")
         notify.text(f"🧪 Mix test ({dept}): {'OK' if ok else 'FAILED'} — {len(mx['chapters'])} "
                     f"tracks, {mx['duration'] / 60:.1f} min rendered (test only, nothing uploaded).")
         db.log("info", "mix", f"test mix {dept} ok={ok} {mx['duration'] / 60:.1f} min")

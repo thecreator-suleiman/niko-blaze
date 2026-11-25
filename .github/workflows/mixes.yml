@@ -1,6 +1,6 @@
 name: Hour mixes
 on:
-  schedule: [{cron: "40 13 * * 6"}]
+  schedule: [{cron: "40 13 * * 5"}]
   workflow_dispatch:
 permissions:
   contents: write
