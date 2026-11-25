@@ -345,13 +345,17 @@ def process_song(sid: str, takes: list, src_dir: Path):
         send_for_approval(sid, master_wav)
         return
     if song["is_single"]:
+        try:  # FYI copy for Kwizera (no approval needed)
+            send_for_approval(sid, master_wav, fyi=True)
+        except Exception as e:
+            db.log("warn", "approval", f"fyi copy not sent: {str(e)[:150]}")
         try:
             render_single(sid, master_wav)
         except Exception as e:  # audio is safe in storage; repair_singles() re-renders on the next run
             db.log("error", "render", f"{sid}: render failed, will retry: {type(e).__name__}: {str(e)[:300]}")
 
 
-def send_for_approval(sid: str, master_wav: Path | None = None):
+def send_for_approval(sid: str, master_wav: Path | None = None, fyi: bool = False):
     """Nothing is posted until Kwizera listens and approves (control: approve <id> / withdraw <id>)."""
     import subprocess, tempfile
     song = db.get().execute("SELECT * FROM songs WHERE id=?", (sid,)).fetchone()
@@ -360,6 +364,10 @@ def send_for_approval(sid: str, master_wav: Path | None = None):
     mp3 = Path(tempfile.mkdtemp()) / f"{song['title']}.mp3"
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(master_wav), "-b:a", "256k", str(mp3)], check=True)
     sub = json.loads(song["brief_json"] or "{}").get("subgenre", "")
+    if fyi:
+        notify.audio(mp3, f"🎵 NEW SINGLE: {song['title']} ({sub}) passed all checks and is being scheduled.\n"
+                          f"ID: {sid}\nTo pull it: Control → withdraw, target {sid}")
+        return
     notify.audio(mp3, f"🎧 APPROVAL NEEDED: {song['title']} ({sub})\nID: {sid}\n"
                       f"Approve: Control → approve, target {sid}\nReject: Control → withdraw, target {sid}")
     db.log("info", "approval", f"{sid} sent for approval")

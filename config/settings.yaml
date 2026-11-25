@@ -80,6 +80,7 @@ lyrics:
   history_similarity_max: 0.18
 
 publishing:
+  require_approval: false   # singles publish automatically after passing QC + hit check; an mp3 copy still goes to Telegram
   # Order of publishers. upload_post works immediately (public, free 10 uploads/month).
   # youtube_api is unlimited but stays private until Google's free audit is approved (then set audited: true).
   # youtube_api_private removed: unaudited API uploads are locked private — better to wait in the queue
