@@ -90,6 +90,12 @@ def load(model_id, dtype):
             mod.to("cuda")
     p.vae.encoder.register_forward_pre_hook(_dit_out)
     p.transformer.register_forward_pre_hook(_dit_in)
+    # Encoders evicted to CPU may be needed again (cover mode encodes a second, text-only condition):
+    # bring any module back to the GPU right before it runs.
+    for n in ("text_encoder", "condition_encoder", "audio_tokenizer", "audio_token_detokenizer"):
+        m = getattr(p, n, None)
+        if m is not None:
+            m.register_forward_pre_hook(_dit_in)
     try:
         p.vae.enable_tiling()
     except Exception:
