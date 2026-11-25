@@ -133,6 +133,15 @@ def _caption(r) -> str:
         return r["caption"]
 
 
+def _style_ref(r) -> str:
+    try:
+        sub = (json.loads(r["brief_json"] or "{}").get("subgenre") or "").lower()
+    except Exception:
+        return ""
+    path = (cfg("generation.style_refs", {}) or {}).get(sub)
+    return f"https://raw.githubusercontent.com/thecreator-suleiman/niko-blaze/main/{path}" if path else ""
+
+
 def provider_chain() -> list[str]:
     """Primary provider first, then backups. Kaggle is skipped while it is unhealthy (quota/auth/rule
     change/repeated errors) and comes back automatically once the cool-down has passed."""
@@ -163,7 +172,8 @@ def submit(song_ids: list[str], providers: list[str] | None = None):
     rows = [db.get().execute("SELECT * FROM songs WHERE id=?", (i,)).fetchone() for i in song_ids]
     jobs = [Job(song_id=r["id"], caption=_caption(r), lyrics=_model_lyrics(r["lyrics"]), hq=bool(r["is_single"]) and cfg("generation.hq_singles", True), duration=r["duration"], bpm=r["bpm"],
                 keyscale=r["keyscale"], seed=r["seed"] + r["attempts"] * 104729,
-                instrumental=r["department"] == "relaxation", candidates=cfg("generation.candidates_per_song"))
+                instrumental=r["department"] == "relaxation", candidates=cfg("generation.candidates_per_song"),
+                reference_url=_style_ref(r))
             for r in rows]
     bid, prov, errs = None, None, []
     for n in names:

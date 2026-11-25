@@ -116,18 +116,51 @@ def _speed_guard(limit_s):
     return cb
 
 
+_REFS = {}
+
+
+def load_ref(url):
+    """Reference audio -> [2, samples] float tensor at 48 kHz (cached per batch)."""
+    if not url:
+        return None
+    if url not in _REFS:
+        try:
+            import urllib.request
+            src, wav = "/tmp/ref_src", "/tmp/ref.wav"
+            urllib.request.urlretrieve(url, src)
+            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", src, "-ar", "48000", "-ac", "2", wav], check=True)
+            a, _ = sf.read(wav, dtype="float32")
+            _REFS[url] = torch.from_numpy(a).T.contiguous()
+        except Exception as e:
+            manifest.setdefault("diag", []).append({"ref_error": str(e)[:200]})
+            _REFS[url] = None
+    return _REFS[url]
+
+
 def gen(pipe, job, seed, duration):
     park(pipe, "cuda")  # make sure every part is back on the GPU (a failed take may have left some on CPU)
     g = torch.Generator(DEV).manual_seed(seed)
     if CUDA:
         torch.cuda.reset_peak_memory_stats()
     with torch.inference_mode():
-        lat = pipe(prompt=job["caption"], lyrics=job["lyrics"], audio_duration=float(duration),
-                   vocal_language=job.get("language", "en"), num_inference_steps=STEPS,
-                   guidance_scale=float(CFG.get("hq_guidance", 7.0)),
-                   callback_on_step_end=_speed_guard(float(CFG.get("max_take_seconds", 1200))),
-                   bpm=job["bpm"], keyscale=job["keyscale"], timesignature="4", generator=g,
-                   output_type="latent").audios
+        ref = load_ref(job.get("reference_url"))
+        extra = {"reference_audio": ref} if ref is not None else {}
+        kw = dict(prompt=job["caption"], lyrics=job["lyrics"], audio_duration=float(duration),
+                  vocal_language=job.get("language", "en"), num_inference_steps=STEPS,
+                  guidance_scale=float(CFG.get("hq_guidance", 7.0)),
+                  callback_on_step_end=_speed_guard(float(CFG.get("max_take_seconds", 1200))),
+                  bpm=job["bpm"], keyscale=job["keyscale"], timesignature="4", generator=g,
+                  output_type="latent")
+        try:
+            lat = pipe(**kw, **extra).audios
+            if extra:
+                manifest.setdefault("diag", []).append({"reference_used": True})
+        except (TypeError, ValueError, RuntimeError) as e:
+            if not extra or "TooSlow" in type(e).__name__:
+                raise
+            manifest.setdefault("diag", []).append({"ref_failed": str(e)[:200]})
+            kw["generator"] = torch.Generator(DEV).manual_seed(seed)
+            lat = pipe(**kw).audios
         diag = {"lat_finite": bool(torch.isfinite(lat).all()), "lat_absmax": float(lat.float().abs().max())}
         manifest.setdefault("diag", []).append(diag)
         if not diag["lat_finite"]:
