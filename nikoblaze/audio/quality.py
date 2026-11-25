@@ -48,7 +48,7 @@ def hit_score(hook: float | None, groove: float | None, match_ratio: float | Non
 
 
 # Stricter per-style check: Amapiano is house-based (log drum, four-on-the-floor); Afrobeats is West African groove.
-SUBGENRE_OK = {"amapiano": {"House music", "Electronic dance music", "Dance music", "Techno", "Electronic music"},
+SUBGENRE_OK = {"amapiano": {"House music", "Electronic dance music", "Dance music", "Techno", "Electronic music", "Disco"},  # real Nyash Energy: House/Disco/Electronic
                "afrobeats": {"Afrobeat", "Music of Africa"}}
 
 
