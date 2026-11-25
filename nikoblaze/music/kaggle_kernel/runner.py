@@ -126,10 +126,17 @@ def load_ref(url):
     if url not in _REFS:
         try:
             import urllib.request
-            src, wav = "/tmp/ref_src", "/tmp/ref.wav"
+            src = "/tmp/ref_src" + os.path.splitext(url)[1]
             urllib.request.urlretrieve(url, src)
-            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", src, "-ar", "48000", "-ac", "2", wav], check=True)
-            a, _ = sf.read(wav, dtype="float32")
+            a, sr = sf.read(src, dtype="float32", always_2d=True)  # libsndfile reads mp3/flac/wav, no ffmpeg needed
+            if a.shape[1] == 1:
+                a = np.repeat(a, 2, axis=1)
+            a = a[:, :2]
+            if sr != 48000:
+                from math import gcd
+                from scipy.signal import resample_poly
+                g_ = gcd(48000, sr)
+                a = resample_poly(a, 48000 // g_, sr // g_, axis=0).astype("float32")
             _REFS[url] = torch.from_numpy(a).T.contiguous()
         except Exception as e:
             manifest.setdefault("diag", []).append({"ref_error": str(e)[:200]})
