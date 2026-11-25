@@ -27,6 +27,16 @@ def select_tracks(dept: str) -> list:
             break
         chosen.append(r)
         total += (r["master_duration"] or r["duration"]) - xf
+    # Always a full hour: if the genre library is still small, play the tracks again in a new order
+    # (never the same track back to back) instead of skipping the live.
+    base = list(chosen)
+    n = 0
+    while total < target and len(base) >= 2 and n < 200:
+        r = base[(n * 3 + 1) % len(base)]
+        if r["id"] != chosen[-1]["id"]:
+            chosen.append(r)
+            total += (r["master_duration"] or r["duration"]) - xf
+        n += 1
     return chosen
 
 
@@ -34,7 +44,7 @@ def build(dept: str) -> dict | None:
     tracks = select_tracks(dept)
     xf = 8 if dept == "relaxation" else 4
     est = sum((t["master_duration"] or t["duration"]) for t in tracks) - xf * max(0, len(tracks) - 1)
-    if est < cfg("schedule.mix_min_minutes", 50) * 60 or len(tracks) < 3:
+    if est < cfg("schedule.mix_min_minutes", 50) * 60 or len({t["id"] for t in tracks}) < 3:
         db.log("warn", "mix", f"{dept}: library too small for a mix ({est / 60:.0f} min available) — skipped")
         return None
     ids = [t["id"] for t in tracks]
