@@ -13,10 +13,10 @@ generation:
   inference_steps: 8          # turbo = 8; raise to 30-50 for sft/base
   candidates_per_song: 2      # generate N takes, keep the best that passes QC
   style_refs:          # own reference tracks: generated songs copy their sound/timbre
-    amapiano: assets/refs/nyash_energy.mp3
+    amapiano: assets/refs/nyash_energy_instrumental.mp3   # vocals removed (Demucs) so new vocals come through
   style_modes: {amapiano: cover}
   cover_steps: 16      # cover needs the SFT model (has the audio tokenizer); fewer steps keep it under the time limit
-  cover_strength: 0.65   # lower = freer new song, higher = closer to the reference groove
+  cover_strength: 0.75   # lower = freer new song, higher = closer to the reference groove
   hq_singles: true            # singles use the high-quality SFT model (better vocals + mix), ~20 min GPU per take
   hq_model_id: ACE-Step/acestep-v15-xl-sft-diffusers
   hq_steps: 40
