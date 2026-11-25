@@ -68,7 +68,8 @@ def make_brief(department: str, rng: random.Random, subgenre: str | None = None)
     avoid_themes = set(_recent_themes(department))
     dur = cfg(f"durations.{department}")
     for _ in range(200):
-        sg = subgenre or rng.choice(list(d["subgenres"]))
+        off = set(cfg("generation.disabled_subgenres", []) or [])
+        sg = subgenre or rng.choice([k for k in d["subgenres"] if k not in off] or list(d["subgenres"]))
         prof = d["subgenres"][sg]
         themes = [t for t in d["themes"] if t not in avoid_themes] or d["themes"]
         instrumental = department == "relaxation"

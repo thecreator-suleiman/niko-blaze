@@ -12,6 +12,7 @@ generation:
   fallback_model_id: ACE-Step/acestep-v15-xl-sft-diffusers   # MIT licence (diffusers format)
   inference_steps: 8          # turbo = 8; raise to 30-50 for sft/base
   candidates_per_song: 2      # generate N takes, keep the best that passes QC
+  disabled_subgenres: [amapiano]   # paused: free model can't make real Amapiano reliably (re-enable with Mureka)
   style_refs:          # own reference tracks: generated songs copy their sound/timbre
     amapiano: assets/refs/nyash_energy_instrumental.mp3   # vocals removed (Demucs) so new vocals come through
   style_modes: {}      # cover mode copied the instrumental too closely: no clear vocals (lyric match 0-31%)
