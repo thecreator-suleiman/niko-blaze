@@ -40,8 +40,8 @@ def main(argv=None):
         storage.push_state(STATE_DB, backup_name=f"nikoblaze-{week}.db")
         return 0
     from . import monitor, pipeline
-    if cmd == "plan":
-        pipeline.plan()
+    if cmd == "plan":  # plan [DEPT N]: today's plan plus N extra songs for DEPT (e.g. top up the weekly mix)
+        pipeline.plan({args[0]: int(args[1])} if len(args) >= 2 else None)
     elif cmd == "collect":
         pipeline.collect()
     elif cmd == "mixes":

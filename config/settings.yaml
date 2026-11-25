@@ -54,7 +54,8 @@ quality:
   vocal_good_lyric_match: 0.55
   instrumental_max_words: 12    # relaxation tracks must not contain sung words
   hit_check: true               # vocal songs: hit potential = hook + groove + natural vocals + production
-  min_hit_score: 70             # below this the take is rejected and regenerated
+  min_hit_score: 70             # weekly single: below this the take is rejected and regenerated
+  min_hit_score_mix: 55         # tracks for the 1-hour live mix (still genre/vocal/mix checked)
 
 mastering:
   sample_rate: 48000

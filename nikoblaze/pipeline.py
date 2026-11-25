@@ -301,9 +301,10 @@ def process_song(sid: str, takes: list, src_dir: Path):
             hook = json.loads(song["brief_json"] or "{}").get("hook_score")
             hs = quality.hit_score(hook, g, ratio, words, qc["score"])
             qc["hit"] = hs
-            if hs["score"] < cfg("quality.min_hit_score", 70):
+            bar = cfg("quality.min_hit_score", 70) if song["is_single"] else cfg("quality.min_hit_score_mix", 55)
+            if hs["score"] < bar:
                 qc["passed"] = False
-                qc["hard"].append(f"hit potential {hs['score']}% < {cfg('quality.min_hit_score', 70)}% {hs['parts']}")
+                qc["hard"].append(f"hit potential {hs['score']}% < {bar}% {hs['parts']}")
         results.append((qc, m, al, path))
         db.log("info", "qc", f"{sid} take {t['take']}: score {qc['score']} passed={qc['passed']} "
                              f"{'; '.join(qc['hard'] + qc['warnings'])} hit={(qc.get('hit') or {}).get('score', '-')}% eq={fix} genre={(t.get('genres') or [['?']])[0][0]}")

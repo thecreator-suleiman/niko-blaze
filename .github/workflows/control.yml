@@ -4,7 +4,7 @@ on:
     inputs:
       action:
         type: choice
-        options: [approve, send-approval, yt-delete, kaggle-restart, api-test, generate-song, generate-mix, test-mix, retry-production, reprocess, reschedule, withdraw, live-check, test-backup, retry-upload, pause, resume, publish, status, telegram-test, gpu-log, gpu-fetch]
+        options: [generate-batch, approve, send-approval, yt-delete, kaggle-restart, api-test, generate-song, generate-mix, test-mix, retry-production, reprocess, reschedule, withdraw, live-check, test-backup, retry-upload, pause, resume, publish, status, telegram-test, gpu-log, gpu-fetch]
       department:
         type: choice
         default: afrobeats
@@ -57,6 +57,7 @@ jobs:
             generate-song) python -m nikoblaze generate-song "${{ inputs.department }}" $TARGET ;;
             generate-mix)  python -m nikoblaze mixes "${{ inputs.department }}" ;;
             test-mix)      python -m nikoblaze test-mix "${{ inputs.department }}" ;;
+            generate-batch) python -m nikoblaze plan "${{ inputs.department }}" $TARGET ;;
             approve)       python -m nikoblaze approve $TARGET ;;
             send-approval) python -m nikoblaze send-approval $TARGET ;;
             withdraw)      python -m nikoblaze withdraw $TARGET ;;
