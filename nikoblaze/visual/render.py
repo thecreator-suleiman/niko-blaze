@@ -35,7 +35,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Cur,{fn},56,{_ass_color(p['accent'])},{_ass_color((255, 255, 255))},&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,3,2,2,80,80,118,1
+Style: Cur,{fn},56,&H00FFFFFF,{_ass_color((255, 255, 255))},&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,3,2,2,80,80,118,1
 Style: Nxt,{fn},36,&H50FFFFFF,&H50FFFFFF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,1,2,80,80,34,1
 
 [Events]
