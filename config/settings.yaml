@@ -30,6 +30,7 @@ generation:
   batch_timeout_hours: 11
 
 mixes:
+  require_approval: true      # the mix preview goes to Telegram Saturday 09:40; no approval = no live
   mode: live                  # live = streamed Saturday 20:00 Kigali with YT_STREAM_KEY (falls back to upload without it)
 
 schedule:                     # quality over quantity (YouTube "inauthentic content" safe)

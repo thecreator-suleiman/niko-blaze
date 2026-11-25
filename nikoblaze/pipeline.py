@@ -367,6 +367,10 @@ def send_for_approval(sid: str, master_wav: Path | None = None):
 
 def approve(sid: str):
     db.kv_set(f"approved:{sid}", "1")
+    if db.get().execute("SELECT 1 FROM mixes WHERE id=?", (sid,)).fetchone():  # the Saturday live mix
+        db.log("info", "approval", f"{sid} approved for Saturday live")
+        notify.text(f"✅ Live mix approved: {sid}. It goes live Saturday 20:00.")
+        return
     db.update("songs", "id", sid, status="ready")
     render_single(sid)
     db.log("info", "approval", f"{sid} approved and queued for publishing")
@@ -482,6 +486,11 @@ def stream_mix():
     if not u:
         db.log("warn", "live", "no mix ready to stream")
         notify.problem("Saturday live: no 1-hour mix was ready to stream this week (not enough new tracks yet).")
+        return
+    if cfg("mixes.require_approval", True) and not db.kv_get(f"approved:{u['ref_id']}"):
+        db.log("warn", "live", f"{u['ref_id']} not approved yet; live skipped")
+        notify.problem(f"Saturday live skipped: the mix {u['ref_id']} was not approved. "
+                       f"Approve it (Control → approve, target {u['ref_id']}) and run Control → stream to go live.")
         return
     if not key:
         db.update("uploads", "id", u["id"], status="pending")  # fall back to a normal upload
@@ -811,6 +820,16 @@ def daily_mixes(depts=None):
                                     badge="1 HOUR MIX")
             _queue_upload("mix", mx["id"], out, thumb, parts={
                 "loop": out.parent / f"{out.stem}_layers" / "loop.mp4", "audio": mx["audio"], "duration": mx["duration"]})
+            try:  # preview for Kwizera: nothing streams until he approves it
+                import subprocess
+                prev = mx["dir"] / f"{mx['id']}_preview.mp3"
+                subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(mx["audio"]), "-ac", "2", "-b:a", "96k",
+                                str(prev)], check=True)
+                tl = "\n".join(f"{int(t // 60):02d}:{int(t % 60):02d} {name}" for t, name in (mx.get("chapters") or [])[:25])
+                notify.audio(prev, f"🎧 SATURDAY LIVE PREVIEW: 1 hour {dept} mix\nID: {mx['id']}\n{tl}\n\n"
+                                   f"Approve: Control → approve, target {mx['id']}\nNot approved = no live.")
+            except Exception as e:
+                db.log("warn", "mix", f"preview not sent: {str(e)[:200]}")
             if cfg("mixes.mode", "live") == "live" and os.environ.get("YT_STREAM_KEY"):
                 # streamed live on Saturday evening instead of uploaded (the stream archive stays on the channel)
                 db.get().execute("UPDATE uploads SET status='live_pending' WHERE ref_id=?", (mx["id"],))

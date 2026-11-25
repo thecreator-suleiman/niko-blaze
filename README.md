@@ -57,7 +57,7 @@ weights**), YuE (needs 24 GB+), Stable Audio Open (no vocals, licence thresholds
 06:10 daily   Produce  → (Mon: single) + 3 tracks for this week's mix → unique briefs → lyrics (LLM + cliché/repetition/history checks) → Kaggle GPU batch
 every 2 h     Collect  → download takes → QC score → reject/accept → master (-14 LUFS, -1 dBTP, 24-bit/48 kHz)
                          → store original + master → single video + 3 vertical Shorts → publish queue
-Saturday 15:40 Mix      → this week's genre: ~60 min of new songs, chapters, looping vinyl video
+Saturday 09:40 Mix      → this week's genre: ~60 min of new songs, chapters, looping vinyl video
 Publishing    single Fri 18:00 · Shorts Tue/Thu/Sat 17:00 · mix Sun 20:00 (Kigali)
 Sunday        Maintenance → prune old originals, DB backup, heartbeat commit
 after each    Pages    → dashboard snapshot
