@@ -77,6 +77,19 @@ def load(model_id, dtype):
         free()
         return out
     p.condition_encoder.register_forward_hook(_evict)
+
+    # Cover mode encodes the reference song through the VAE while the 11 GB DiT sits on the GPU (OOM on T4).
+    # Park the DiT in CPU RAM while encoding; it comes back right before denoising.
+    def _dit_out(mod, args):
+        if next(p.transformer.parameters()).device.type == "cuda":
+            p.transformer.to("cpu")
+            free()
+
+    def _dit_in(mod, args):
+        if next(mod.parameters()).device.type != "cuda":
+            mod.to("cuda")
+    p.vae.encoder.register_forward_pre_hook(_dit_out)
+    p.transformer.register_forward_pre_hook(_dit_in)
     try:
         p.vae.enable_tiling()
     except Exception:
