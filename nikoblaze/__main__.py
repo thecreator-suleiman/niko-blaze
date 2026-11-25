@@ -62,7 +62,6 @@ def main(argv=None):
     elif cmd == "retry-production":
         pipeline.retry_production()
     elif cmd == "cancel-subgenre":  # drop every queued song of a paused subgenre (e.g. amapiano)
-        from . import db
         n = db.get().execute("UPDATE songs SET status='abandoned' WHERE status IN ('retry','planned','submitted',"
                              "'awaiting_approval') AND brief_json LIKE ?", (f'%"subgenre": "{args[0]}"%',)).rowcount
         db.get().commit()
