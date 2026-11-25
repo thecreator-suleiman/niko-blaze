@@ -44,6 +44,7 @@ def test_end_to_end(tmp, monkeypatch):
                         lambda dept, title, audio, lines, dur, out, **k: (out.write_bytes(b"x"), out)[1])
     monkeypatch.setenv("NB_SCHEDULE__SINGLE_DAYS", "[Mon, Tue, Wed, Thu, Fri, Sat, Sun]")
     monkeypatch.setenv("NB_SCHEDULE__MIX_TRACKS_PER_DAY", "0")
+    monkeypatch.setenv("NB_PUBLISHING__REQUIRE_APPROVAL", "false")
     monkeypatch.setattr(pipeline, "week_mix_department", lambda when=None: "relaxation")
     monkeypatch.setattr(pipeline, "render_single", lambda sid, w=None: pipeline._queue_upload(
         "single", sid, _dummy(tmp, "v.mp4"), _dummy(tmp, "t.jpg")))
