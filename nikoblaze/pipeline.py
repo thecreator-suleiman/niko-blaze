@@ -272,6 +272,9 @@ def _requeue(song_ids, reason):
 
 def process_song(sid: str, takes: list, src_dir: Path):
     song = db.get().execute("SELECT * FROM songs WHERE id=?", (sid,)).fetchone()
+    if song["status"] in ("abandoned", "rejected"):  # cancelled while it was generating (e.g. a paused genre)
+        db.log("info", "qc", f"{sid} skipped: {song['status']}")
+        return
     dept, instrumental = song["department"], song["department"] == "relaxation"
     results = []
     for t in takes:
