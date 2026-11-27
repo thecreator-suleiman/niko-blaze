@@ -1,6 +1,6 @@
 name: Saturday live stream (1-hour mix)
 on:
-  schedule: [{cron: "58 17 * * 6"}]   # Saturday 19:58 Kigali -> live at ~20:00
+  schedule: [{cron: "30 17 * * 6"}]   # Saturday 19:30 Kigali: render scene, wait, live at 20:00
   workflow_dispatch:
 permissions:
   contents: write
@@ -8,7 +8,7 @@ concurrency: {group: nikoblaze-state, cancel-in-progress: false}
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 100
+    timeout-minutes: 140
     env:
       GH_TOKEN: ${{ github.token }}
       GITHUB_TOKEN: ${{ github.token }}

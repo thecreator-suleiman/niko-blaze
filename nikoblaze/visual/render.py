@@ -121,17 +121,10 @@ def render_song(dept: str, title: str, audio: Path, lines: list[dict], duration:
 
 
 def render_mix(dept: str, title: str, audio_m4a: Path, duration: float, out: Path, badge: str) -> Path:
-    """Render one seamless 18 s loop (10 record rotations), then stream-copy it for the whole hour."""
+    """Animated 'live session' scene (no lyrics, no vinyl deck), looped seamlessly for the whole hour."""
+    from . import live_scene
     tmp = out.parent / (out.stem + "_layers")
-    vx, vy = _compose(dept, title, "Pre-recorded 1-hour mix · Niko Blaze", tmp, badge=badge)
-    loop = tmp / "loop.mp4"
-    loop_len = 10 * 60 / RPM  # exactly 10 rotations = 18 s
-    ffmpeg("-loop", "1", "-framerate", str(FPS), "-i", str(tmp / "base.png"),
-           "-loop", "1", "-framerate", str(FPS), "-i", str(tmp / "vinyl.png"),
-           "-loop", "1", "-framerate", str(FPS), "-i", str(tmp / "top.png"),
-           "-filter_complex", _rotate_graph(vx, vy), "-map", "[b2]", "-t", f"{loop_len:.3f}", "-r", str(FPS),
-           "-c:v", "libx264", "-preset", "slow", "-crf", "23", "-g", str(int(loop_len * FPS)),
-           "-pix_fmt", "yuv420p", str(loop))
+    loop = live_scene.render_loop(dept, tmp / "loop.mp4")
     ffmpeg("-stream_loop", "-1", "-i", str(loop), "-i", str(audio_m4a), "-map", "0:v", "-map", "1:a",
            "-c", "copy", "-t", f"{duration:.3f}", "-movflags", "+faststart", str(out))
     return out

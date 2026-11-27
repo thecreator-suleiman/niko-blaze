@@ -509,11 +509,18 @@ def stream_mix():
         return
     wd = work_dir("live", u["ref_id"])
     parts = json.loads(u["video_asset"])
-    loop, audio = storage.download(parts["loop"], wd), storage.download(parts["audio"], wd)
-    loop2 = wd / "loop_live.mp4"  # YouTube wants a keyframe every <= 4 s
-    analysis.ffmpeg("-i", str(loop), "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-g", "60",
-           "-keyint_min", "60", "-pix_fmt", "yuv420p", "-an", str(loop2))
+    audio = storage.download(parts["audio"], wd)
     mx = db.get().execute("SELECT * FROM mixes WHERE id=?", (u["ref_id"],)).fetchone()
+    loop2 = wd / "loop_live.mp4"  # animated live-session scene (no lyrics); keyframe every 2 s for YouTube Live
+    try:
+        from .visual import live_scene
+        live_scene.render_loop(mx["department"] if mx else "reggae", loop2)
+    except Exception as e:  # never miss the live: fall back to the loop rendered on Friday
+        db.log("warn", "live", f"live scene render failed, using stored loop: {e}")
+        loop = storage.download(parts["loop"], wd)
+        analysis.ffmpeg("-i", str(loop), "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-g", "60",
+               "-keyint_min", "60", "-pix_fmt", "yuv420p", "-an", str(loop2))
+    _wait_until_kigali(20, 0)  # workflow starts early so rendering never delays the 20:00 start
     meta = metadata.live(mx["department"], mx["volume"], json.loads(mx["chapters"] or "[]")) if mx else None
     title = meta["title"] if meta else "1 hour mix"
     db.update("uploads", "id", u["id"], status="streaming")
@@ -543,6 +550,15 @@ def stream_mix():
     else:
         db.update("uploads", "id", u["id"], status="live_pending")
         notify.problem(f"Saturday live stream failed: {r.stderr[-300:]}")
+
+
+def _wait_until_kigali(hour: int, minute: int):
+    import time
+    now = datetime.now(timezone.utc)
+    target = now.replace(hour=(hour - 2) % 24, minute=minute, second=0, microsecond=0)
+    wait = (target - now).total_seconds()
+    if 0 < wait < 3600:
+        time.sleep(wait)
 
 
 def _find_live_video(proc, timeout=600) -> str | None:
