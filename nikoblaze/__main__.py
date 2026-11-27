@@ -66,6 +66,8 @@ def main(argv=None):
                              "'awaiting_approval') AND brief_json LIKE ?", (f'%"subgenre": "{args[0]}"%',)).rowcount
         db.get().commit()
         db.log("info", "plan", f"cancelled {n} queued {args[0]} songs")
+    elif cmd == "import-song":  # import-song <folder>: publish a song Kwizera made himself
+        pipeline.import_song(args[0])
     elif cmd == "approve":
         pipeline.approve(args[0])
     elif cmd == "send-approval":

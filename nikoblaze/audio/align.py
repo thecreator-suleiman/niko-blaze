@@ -66,5 +66,14 @@ def transcribe_cpu(path, model="small") -> list[dict]:
     """Fallback when the GPU runner did not provide word timings (needs `pip install faster-whisper`)."""
     from faster_whisper import WhisperModel
     wm = WhisperModel(model, device="cpu", compute_type="int8")
-    segs, _ = wm.transcribe(str(path), language="en", word_timestamps=True)
+    segs, _ = wm.transcribe(_pcm16k(path), language="en", word_timestamps=True)
     return [{"w": w.word.strip(), "s": w.start, "e": w.end, "p": w.probability} for s in segs for w in (s.words or [])]
+
+
+def _pcm16k(path):
+    """Decode with ffmpeg (avoids PyAV version clashes like 'unexpected keyword metadata_errors')."""
+    import subprocess
+    import numpy as np
+    raw = subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-i", str(path), "-f", "s16le", "-ac", "1",
+                          "-ar", "16000", "-"], capture_output=True, check=True).stdout
+    return np.frombuffer(raw, np.int16).astype(np.float32) / 32768.0

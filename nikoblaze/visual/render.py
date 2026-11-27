@@ -46,7 +46,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     for i, ln in enumerate(lines):
         start = ln["start"] - 0.2
         nxt = lines[i + 1]["start"] if i + 1 < len(lines) else duration
-        end = min(max(ln["end"] + 1.2, start + 1.5), nxt - 0.05) if i + 1 < len(lines) else min(ln["end"] + 3, duration)
+        end = min(max(ln["end"] + 1.2, start + 1.5), nxt - 0.25) if i + 1 < len(lines) else min(ln["end"] + 3, duration)
         if end <= start:
             end = start + 0.8
         k, cursor = [], start

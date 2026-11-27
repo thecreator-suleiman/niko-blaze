@@ -928,3 +928,57 @@ def prune_originals():
                               (cutoff,)).fetchall():
         storage.delete_asset(r["original_asset"])
         db.update("songs", "id", r["id"], original_asset=None)
+
+
+# ------------------------------------------------------------------ artist-supplied songs
+def import_song(folder: str):
+    """Publish a finished song Kwizera made himself (assets/imports/<name>/: audio.flac, lyrics.txt,
+    thumb.jpg, meta.json). No AI generation, QC or retitling; his mix is used as-is (no re-mastering).
+    It is queued as a single with a fixed release time; weekly pacing still applies."""
+    from PIL import Image
+    src = Path(folder)
+    meta = json.loads((src / "meta.json").read_text())
+    sid = meta["id"]
+    if db.get().execute("SELECT 1 FROM songs WHERE id=?", (sid,)).fetchone():
+        db.log("info", "import", f"{sid} already imported")
+        return
+    lyrics = (src / "lyrics.txt").read_text()
+    wd = work_dir("songs", sid)
+    wav = wd / f"{sid}_master.wav"
+    analysis.ffmpeg("-i", str(src / "audio.flac"), "-ar", "48000", "-c:a", "pcm_s24le", str(wav))
+    dur = analysis.probe_duration(wav)
+    try:
+        words = align.transcribe_cpu(wav)
+    except Exception as e:
+        db.log("warn", "import", f"{sid}: transcription failed, lyrics spread evenly: {e}")
+        words = []
+    al = align.align(lyrics, words, dur)
+    flac = wd / f"{sid}_master.flac"
+    mastering.to_flac(wav, flac)
+    tag = f"{cfg('storage.release_prefix', 'media')}-{datetime.now(TZ):%Y%m%d}"
+    ref = storage.upload(tag, flac)
+    brief = {"subgenre": meta["subgenre"], "concept": meta.get("concept"), "lyrics_provider": "none",
+             "imported": True}
+    with db.tx() as c:
+        c.execute("INSERT INTO songs(id,department,subgenre,title,brief_json,lyrics,duration,is_single,status,"
+                  "original_asset,master_asset,master_duration,align_json,created_at,updated_at) "
+                  "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  (sid, meta["department"], meta["subgenre"], meta["title"], json.dumps(brief), lyrics, dur, 1,
+                   "importing", ref, ref, dur, json.dumps(al), db.now(), db.now()))
+    rights.record("song", sid, ["audio:artist-original", "visual:procedural", "font:system", "visual:portrait",
+                                "visual:ai-thumbnail"])
+    set_variant(int(hashlib.sha1(sid.encode()).hexdigest(), 16))
+    out = wd / f"{sid}.mp4"
+    render.render_song(meta["department"], meta["title"], wav, al["lines"], dur, out, badge=meta["subgenre"].upper())
+    thumb = wd / f"{sid}_thumb.jpg"
+    Image.open(src / "thumb.jpg").convert("RGB").resize((1280, 720)).save(thumb, "JPEG", quality=90)
+    _queue_upload("single", sid, out, thumb)
+    when = datetime.strptime(meta["publish_at_kigali"], "%Y-%m-%d %H:%M").replace(tzinfo=TZ)
+    with db.tx() as c:
+        c.execute("UPDATE uploads SET publish_at=? WHERE ref_id=?",
+                  (when.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), sid))
+    db.update("songs", "id", sid, status="ready")
+    db.log("info", "import", f"{sid} '{meta['title']}' imported; release {meta['publish_at_kigali']} Kigali")
+    notify.text(f"🎵 Your song \"{meta['title']}\" ({meta['subgenre']}) is ready and queued as the next single: "
+                f"goes public {meta['publish_at_kigali']} (Kigali). Lyrics matched: {al['match_ratio']:.0%}.")
+    shutil.rmtree(wd, ignore_errors=True)

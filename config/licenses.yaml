@@ -92,3 +92,14 @@ components:
     licence: n/a
     commercial_use: true
     status: verified
+  audio:artist-original:
+    what: Song written, produced and supplied by the artist (Kwizera) himself
+    licence: Owned by the artist
+    commercial_use: true
+    status: verified
+  visual:ai-thumbnail:
+    what: Thumbnail background made with Google Gemini image generation (paid API), artist photo composited
+    licence: Gemini API terms (outputs owned by the user)
+    commercial_use: true
+    source: https://ai.google.dev/gemini-api/terms
+    status: verified
