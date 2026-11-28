@@ -68,6 +68,18 @@ def main(argv=None):
         db.log("info", "plan", f"cancelled {n} queued {args[0]} songs")
     elif cmd == "import-song":  # import-song <folder>: publish a song Kwizera made himself
         pipeline.import_song(args[0])
+    elif cmd == "reimport-song":  # re-render an imported song that is not on YouTube yet (keeps its release time)
+        import json as _j
+        sid = _j.load(open(f"{args[0]}/meta.json"))["id"]
+        c = db.get()
+        if c.execute("SELECT 1 FROM uploads WHERE ref_id=? AND youtube_id IS NOT NULL", (sid,)).fetchone():
+            db.log("warn", "import", f"{sid} already on YouTube; not re-rendered")
+        else:
+            c.execute("DELETE FROM uploads WHERE ref_id=?", (sid,))
+            c.execute("DELETE FROM rights WHERE ref_id=?", (sid,))
+            c.execute("DELETE FROM songs WHERE id=?", (sid,))
+            c.commit()
+            pipeline.import_song(args[0])
     elif cmd == "approve":
         pipeline.approve(args[0])
     elif cmd == "send-approval":

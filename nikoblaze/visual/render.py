@@ -35,8 +35,8 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Cur,{fn},56,&H00FFFFFF,{_ass_color((255, 255, 255))},&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,3,2,2,80,80,118,1
-Style: Nxt,{fn},36,&H50FFFFFF,&H50FFFFFF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,1,2,80,80,34,1
+Style: Cur,{fn},50,&H00FFFFFF,{_ass_color((255, 255, 255))},&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,3,2,2,60,60,128,1
+Style: Nxt,{fn},34,&H50FFFFFF,&H50FFFFFF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,2,1,2,60,60,72,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -66,7 +66,7 @@ def _compose(dept: str, title: str, subtitle: str, out_dir: Path, badge: str | N
     p = pal(dept)
     portrait, _ = assets.load_portrait()
     bg = assets.background(dept, portrait=portrait)
-    card = assets.portrait_card(portrait, 520, p["accent"])
+    card = assets.portrait_card(portrait, 440, p["accent"])
     bg.alpha_composite(card, (110, 150))
     base_deck, top_deck, (pcx, pcy) = assets.deck(dept, vinyl_size=VINYL)
     bg.alpha_composite(base_deck, DECK_POS)
@@ -78,11 +78,18 @@ def _compose(dept: str, title: str, subtitle: str, out_dir: Path, badge: str | N
     tw = d.textlength(chip, font=cf)
     d.rounded_rectangle((W - 150 - tw - 40, 66, W - 150, 116), radius=25, outline=p["accent"], width=3)
     d.text((W - 150 - tw - 20, 76), chip, font=cf, fill=p["accent"])
-    tf = font(50)
-    y = 760
+    # lyrics band (y >= 860) is kept clear of the title, portrait and deck; darken it for readability
+    band = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    bd = ImageDraw.Draw(band)
+    for yy in range(840, H):
+        bd.line((0, yy, W, yy), fill=(0, 0, 0, int(150 * min(1, (yy - 840) / 60))))
+    bg.alpha_composite(band)
+    d = ImageDraw.Draw(bg)
+    tf = font(46)
+    y = 655
     for line in textwrap.wrap(title, 22)[:2]:
         d.text((150, y), line, font=tf, fill=(255, 255, 255), stroke_width=2, stroke_fill=(0, 0, 0))
-        y += 62
+        y += 56
     d.text((152, y + 6), subtitle, font=font(30, bold=False), fill=(*p["accent2"],))
     out_dir.mkdir(parents=True, exist_ok=True)
     bg.convert("RGB").save(out_dir / "base.png")
@@ -109,7 +116,7 @@ def render_song(dept: str, title: str, audio: Path, lines: list[dict], duration:
     acc = "0x%02X%02X%02X" % pal(dept)["accent"]
     graph = (_rotate_graph(vx, vy) +
              f";[3:a]showwaves=s=960x44:mode=cline:draw=full:rate={FPS}:colors={acc}@0.85,format=rgba[wav];"
-             f"[b2][wav]overlay=x=480:y=1028:format=rgb[b3];[b3]ass='{ass.as_posix()}'[v]")
+             f"[b2][wav]overlay=x=480:y=1032:format=rgb[b3];[b3]ass='{ass.as_posix()}'[v]")
     ffmpeg("-loop", "1", "-framerate", str(FPS), "-i", str(tmp / "base.png"),
            "-loop", "1", "-framerate", str(FPS), "-i", str(tmp / "vinyl.png"),
            "-loop", "1", "-framerate", str(FPS), "-i", str(tmp / "top.png"),
