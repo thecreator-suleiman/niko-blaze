@@ -1,0 +1,22 @@
+name: Live metadata (fix title/description/tags of a running live)
+# Read-only on state (no state-push), so it can run while the live stream job holds the state lock.
+on:
+  workflow_dispatch:
+    inputs:
+      video_id: {description: "YouTube video id of the live", required: true}
+permissions:
+  contents: read
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+      YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+      YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: python -m nikoblaze live-meta "${{ inputs.video_id }}"

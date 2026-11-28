@@ -88,12 +88,31 @@ LIVE_TITLES = {
 }
 
 
+LIVE_ABOUT = {
+    "reggae": ("feel-good roots reggae, lovers rock and conscious one drop vibes", "If you love reggae music",
+               "#Reggae #ReggaeMusic #ReggaeLive #RootsReggae #ReggaeMix #LoversRock #ReggaeVibes #Reggae2026"),
+    "afrobeats": ("afrobeats, afropop and afro-fusion grooves", "If you love afrobeats",
+                  "#Afrobeats #AfrobeatsLive #AfrobeatsMix #Afropop #NaijaMusic #AfricanMusic #Afrobeats2026"),
+    "relaxation": ("calm, peaceful relaxing music", "If you love calm music",
+                   "#RelaxingMusic #StudyMusic #SleepMusic #CalmMusic #RelaxingLive #ChillMusic"),
+}
+
+
 def live(dept: str, volume: int, chapters: list) -> dict:
-    """Title/description for the Saturday live stream of the weekly mix."""
+    """Title/description/tags for the Saturday live stream of the weekly mix (SEO: many relevant tags/hashtags)."""
     label = DEPARTMENTS[dept]["label"]
     title = LIVE_TITLES.get(dept, f"🔴 {label} LIVE – 1 Hour Mix | Niko Blaze")[:100]
+    about, love, tags_line = LIVE_ABOUT.get(dept, (label.lower(), "If you love this music", HASHTAGS.get(dept, "")))
     lines = "\n".join(clean(name) for _, name in chapters)
-    desc = (f"Live now: one hour of brand-new original {label.lower()} music by Niko Blaze (Vol. {volume}). "
-            f"Pre-recorded mix, streamed live — say hi in the chat and tell us where you're listening from!\n\n"
-            f"TRACKLIST\n{lines}\n\nSubscribe for a new single every week and a new live mix every Saturday.\n\n#NikoBlaze")
-    return {"title": title, "description": clean(desc)[:4900], "tags": _tags(dept, ["live", "1 hour mix"])}
+    g = {"reggae": "reggae", "afrobeats": "afrobeats", "relaxation": "relaxing"}.get(dept, dept)
+    desc = (f"🔴 LIVE NOW: 1 hour of non-stop {about} by Niko Blaze (Vol. {volume}).\n"
+            f"{love}, SUBSCRIBE 🔔 and turn on notifications — a new live mix every Saturday 20:00 (Kigali) "
+            f"and a new single every Friday.\n\n"
+            f"Perfect for relaxing, working, studying, driving, cooking or chilling with friends. "
+            f"Say hi in the chat and tell us where you're listening from! 🌍\n\n"
+            f"TRACKLIST\n{lines}\n\n"
+            f"👍 Like and share this live with someone who loves {g} music.\n\n"
+            f"{tags_line} #NikoBlaze #LiveMusic #1HourMix")
+    extra = [f"{g} live", f"{g} live stream", f"1 hour {g} mix", f"{g} mix 2026", f"non stop {g}",
+             "live music", "1 hour mix", "live"]
+    return {"title": title, "description": clean(desc)[:4900], "tags": _tags(dept, extra)}

@@ -68,6 +68,11 @@ def main(argv=None):
         db.log("info", "plan", f"cancelled {n} queued {args[0]} songs")
     elif cmd == "import-song":  # import-song <folder>: publish a song Kwizera made himself
         pipeline.import_song(args[0])
+    elif cmd == "live-meta":  # live-meta <youtube_id>: (re)apply title/description/tags to the running live
+        from .youtube import client as yt, metadata
+        mx = db.get().execute("SELECT * FROM mixes ORDER BY created_at DESC LIMIT 1").fetchone()
+        yt.update_video(args[0], metadata.live(mx["department"], mx["volume"], json.loads(mx["chapters"] or "[]")))
+        db.log("info", "live", f"live metadata updated on {args[0]}")
     elif cmd == "reimport-song":  # re-render an imported song that is not on YouTube yet (keeps its release time)
         import json as _j
         sid = _j.load(open(f"{args[0]}/meta.json"))["id"]
