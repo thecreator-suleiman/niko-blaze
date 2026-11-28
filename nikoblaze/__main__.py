@@ -68,6 +68,15 @@ def main(argv=None):
         db.log("info", "plan", f"cancelled {n} queued {args[0]} songs")
     elif cmd == "import-song":  # import-song <folder>: publish a song Kwizera made himself
         pipeline.import_song(args[0])
+    elif cmd == "thumb-test":  # sends a sample single + live thumbnail to Telegram
+        from pathlib import Path
+        from . import notify
+        from .visual import thumbnails
+        a = thumbnails.make("reggae", "Sunday Morning Love", Path("work/t_single.jpg"), badge="REGGAE",
+                            concept="A man wakes up next to the love of his life and promises never to let her go.")
+        b = thumbnails.make("reggae", "", Path("work/t_live.jpg"), kind="live")
+        notify.photo(a, "Thumbnail test: single")
+        notify.photo(b, "Thumbnail test: Saturday live")
     elif cmd == "live-meta":  # live-meta <youtube_id>: (re)apply title/description/tags to the running live
         from .youtube import client as yt, metadata
         mx = db.get().execute("SELECT * FROM mixes ORDER BY created_at DESC LIMIT 1").fetchone()

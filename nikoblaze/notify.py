@@ -125,3 +125,15 @@ def credential_reminders(today=None) -> list:
         text(msg)
         sent.append(c["secret"])
     return sent
+
+
+def photo(path, caption: str = "") -> bool:
+    if not enabled():
+        return False
+    try:
+        with open(path, "rb") as f:
+            _call("sendPhoto", {"caption": caption[:1000]}, files={"photo": f})
+        return True
+    except Exception as e:
+        print(f"[WARN] telegram photo: {e}")
+        return False

@@ -428,7 +428,8 @@ def render_single(sid: str, master_wav: Path | None = None):
     badge = (json.loads(song["brief_json"]).get("subgenre") or "").upper() or None  # the song's real genre
     render.render_song(song["department"], song["title"], Path(master_wav), al["lines"], song["master_duration"], out,
                        badge=badge)
-    thumb = thumbnails.make(song["department"], song["title"], wd / f"{sid}_thumb.jpg", badge=badge)
+    thumb = thumbnails.make(song["department"], song["title"], wd / f"{sid}_thumb.jpg", badge=badge,
+                            concept=json.loads(song["brief_json"]).get("concept"), lyrics=song["lyrics"])
     _queue_upload("single", sid, out, thumb)
     for k, st in enumerate(short_starts(song, al["lines"])):
         short = wd / f"{sid}_short{k}.mp4"
@@ -844,7 +845,7 @@ def daily_mixes(depts=None):
             render.render_mix(dept, f"1 Hour {dept.title()} Mix · Vol. {mx['volume']}", mx["audio"], mx["duration"],
                               out, badge="1 HOUR · PRE-RECORDED")
             thumb = thumbnails.make(dept, f"1 Hour {dept.title()} Mix", mx["dir"] / f"{mx['id']}_thumb.jpg",
-                                    badge="1 HOUR MIX")
+                                    kind="live")
             _queue_upload("mix", mx["id"], out, thumb, parts={
                 "loop": out.parent / f"{out.stem}_layers" / "loop.mp4", "audio": mx["audio"], "duration": mx["duration"]})
             send_mix_preview(mx, dept, "Goes live Saturday 20:00 Kigali.")
@@ -888,7 +889,7 @@ def test_mix(dept: str = "relaxation"):
         out = mx["dir"] / f"{mx['id']}.mp4"
         render.render_mix(dept, f"1 Hour {dept.title()} Mix · Vol. {mx['volume']}", mx["audio"], mx["duration"],
                           out, badge="1 HOUR · PRE-RECORDED")
-        thumbnails.make(dept, f"1 Hour {dept.title()} Mix", mx["dir"] / f"{mx['id']}_thumb.jpg", badge="1 HOUR MIX")
+        thumbnails.make(dept, f"1 Hour {dept.title()} Mix", mx["dir"] / f"{mx['id']}_thumb.jpg", kind="live")
         loop = out.parent / f"{out.stem}_layers" / "loop.mp4"
         ok = loop.exists() and Path(mx["audio"]).exists()
         send_mix_preview(mx, dept, "Preview of the tracks ready so far (not final, nothing posted).")

@@ -4,7 +4,7 @@ on:
     inputs:
       action:
         type: choice
-        options: [import-song, reimport-song, cancel-subgenre, stream, generate-batch, approve, send-approval, yt-delete, kaggle-restart, api-test, generate-song, generate-mix, test-mix, retry-production, reprocess, reschedule, withdraw, live-check, test-backup, retry-upload, pause, resume, publish, status, telegram-test, gpu-log, gpu-fetch]
+        options: [thumb-test, import-song, reimport-song, cancel-subgenre, stream, generate-batch, approve, send-approval, yt-delete, kaggle-restart, api-test, generate-song, generate-mix, test-mix, retry-production, reprocess, reschedule, withdraw, live-check, test-backup, retry-upload, pause, resume, publish, status, telegram-test, gpu-log, gpu-fetch]
       department:
         type: choice
         default: afrobeats
