@@ -557,7 +557,7 @@ def _wait_until_kigali(hour: int, minute: int):
     now = datetime.now(timezone.utc)
     target = now.replace(hour=(hour - 2) % 24, minute=minute, second=0, microsecond=0)
     wait = (target - now).total_seconds()
-    if 0 < wait < 3600:
+    if 0 < wait < 4 * 3600:
         time.sleep(wait)
 
 
